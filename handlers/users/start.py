@@ -51,12 +51,11 @@ async def start_bot(message: types.Message):
         print(f"Foydalanuvchini qo'shishda xatolik: {e}")
 
     if await is_user_subscribed(user_id):
-        msg = f"""👋 Salom {message.from_user.first_name}
-
-Marhamat, kerakli kodni yuboring:"""
+        user_name=message.from_user.username
+        msg = f"""👋 Salom <a href="tg://user?id={user_id}">{message.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://telegram.me/+sbhRwouw7jc0YzBi")]])
-        await message.reply(msg, reply_markup=chanel)
+        await message.reply(msg, reply_markup=chanel,parse_mode="HTML")
     else:
         await message.answer(
             "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
@@ -66,15 +65,16 @@ Marhamat, kerakli kodni yuboring:"""
 
 
 @dp.callback_query(lambda c: c.data == "subscribe_true")
-async def oldim(call: types.CallbackQuery):
+async def oldim(message: types.Message,call: types.CallbackQuery):
     await call.message.delete()
-    if await is_user_subscribed(call.from_user.id):
-        msg = """👋 Salom 
+    user_id = message.from_user.id
 
-        Marhamat, kerakli kodni yuboring:"""
+    if await is_user_subscribed(call.from_user.id):
+        user_name = message.from_user.username
+        msg = f"""👋 Salom <a href="tg://user?id={user_id}">{message.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://telegram.me/+sbhRwouw7jc0YzBi")]])
-        await call.message.answer(msg, reply_markup=chanel)
+        await call.message.answer(msg, reply_markup=chanel,parse_mode="HTML")
     else:
         await call.message.answer("Iltimios! ⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
                                   reply_markup=await subscription_button())

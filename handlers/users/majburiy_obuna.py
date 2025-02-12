@@ -70,10 +70,12 @@ async def list_channels(message: types.Message):
     if channels:
         # URLni tekshirish va formatlash
         channels_text = "\n\n".join(
-            [f"{channel}" if channel.startswith("https://t.me/") else f"https://t.me/{channel}" for channel in channels]
+            [channel if channel.startswith(("https://t.me/", "https://telegram.me/")) else f"https://t.me/{channel}" for channel in channels]
         )
         await message.answer(f"Majburiy kanallar:\n\n{channels_text}")
     else:
         await message.answer("Majburiy kanallar qo'shilmagan.")
+
+
 
 

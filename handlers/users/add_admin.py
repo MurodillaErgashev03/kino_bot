@@ -14,6 +14,14 @@ async def orqaga(message: types.Message, state: FSMContext):
     await state.clear()
     await message.answer("🔝 Asosiy Menyu", reply_markup=admin_button())
 
+@dp.message(F.text == "👁‍🗨 Adminlarni ko'rish", IsBotAdmin())
+async def list_channels(message: types.Message):
+    admins = db.get_all_admins()
+    if admins:
+        channels_text = "\n\n".join(
+            [f"{admin['user_name']}" if admin['user_name'].startswith("") else f"{admin['user_name']}" for admin in admins]
+        )
+        await message.answer(f"Adminlar:\n\n{channels_text}")
 
 @dp.message(F.text == "➕ Admin qo'shish", IsBotAdmin())
 async def add_admin(message: types.Message, state: FSMContext):
