@@ -51,7 +51,7 @@ async def start_bot(message: types.Message):
         print(f"Foydalanuvchini qo'shishda xatolik: {e}")
 
     if await is_user_subscribed(user_id):
-        msg = """👋 Salom 
+        msg = f"""👋 Salom {message.from_user.first_name}
 
 Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[

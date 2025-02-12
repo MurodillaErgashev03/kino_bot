@@ -22,7 +22,7 @@ async def return_film_or_serial(message: types.Message, state: FSMContext):
             text = (
                 f"⌨️ KOD: #{row['kod']}\n"
                 f"📑 Name: {name_film['file_name']}\n\n"
-                f" 📍Bizning bot: @kmfilmlar_bot"
+                f"📌 Bizning : @Gold_kinolar_bot "
             )
             await message.answer_video(row['file_id'], caption=text, parse_mode="HTML")
         else:
