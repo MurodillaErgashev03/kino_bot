@@ -65,13 +65,13 @@ async def start_bot(message: types.Message):
 
 
 @dp.callback_query(lambda c: c.data == "subscribe_true")
-async def oldim(message: types.Message,call: types.CallbackQuery):
+async def oldim(call: types.CallbackQuery):
     await call.message.delete()
-    user_id = message.from_user.id
+    user_id = call.message.from_user.id
 
     if await is_user_subscribed(call.from_user.id):
-        user_name = message.from_user.username
-        msg = f"""👋 Salom <a href="tg://user?id={user_id}">{message.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
+        user_name = call.message.from_user.username
+        msg = f"""👋 Salom <a href="tg://user?id={user_id}">{call.message.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://telegram.me/+sbhRwouw7jc0YzBi")]])
         await call.message.answer(msg, reply_markup=chanel,parse_mode="HTML")
