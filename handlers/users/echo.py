@@ -21,7 +21,7 @@ async def return_film_or_serial(message: types.Message, state: FSMContext):
             name_film = db.get_film_by_name(film_id)  # get_film_by_name ga film_id uzatiladi
             text = (
                 f"⌨️ KOD: #{row['kod']}\n"
-                f"📑 Name: {name_film['file_name']}\n\n"
+                f"{name_film['file_name']}\n\n"
                 f"📌 Bizning : @Gold_kinolar_bot "
             )
             await message.answer_video(row['file_id'], caption=text, parse_mode="HTML")

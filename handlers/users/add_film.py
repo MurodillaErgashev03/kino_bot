@@ -43,7 +43,7 @@ async def get_video_file_id(message: types.Message, state: FSMContext):
     data = await state.get_data()
     text = (
         f"⌨️ KOD: #{data['kod']}\n"
-        f"📑 Name: {data['name']}\n\n"
+        f"{data['name']}\n\n"
 
     )
 
