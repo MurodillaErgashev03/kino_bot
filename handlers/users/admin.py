@@ -15,11 +15,11 @@ async def start_admin_bot(message: types.Message):
     await message.answer("🔝 Admin panel....", reply_markup=admin_button())
 
 
-@dp.message(F.text == "📀 Kino joylash / O'chrish")
+@dp.message(F.text == "📀 Kino joylash / O'chrish", IsBotAdmin())
 async def delete_or_join(message: types.Message, state: FSMContext):
     await message.answer("📀 Kino joylash / O'chrish bo'limi !", reply_markup=film_delete_or_join())
 
-@dp.message(F.text == "📽 Seril joylash / O'chrish")
+@dp.message(F.text == "📽 Seril joylash / O'chrish", IsBotAdmin())
 async def delete_or_join(message: types.Message, state: FSMContext):
     await message.answer("📽 Seril joylash / O'chrish bo'limi !", reply_markup=serial_delete_or_join())
 
