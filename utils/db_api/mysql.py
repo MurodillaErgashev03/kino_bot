@@ -283,7 +283,7 @@ class Database:
 
     def get_film_by_name(self, kod: int):
         sql = """
-        SELECT file_name FROM data WHERE kod = %s
+        SELECT file_name, file_id, kod FROM data WHERE kod = %s
         """
         return self.execute(sql, parameters=(kod,), fetchone=True)
 

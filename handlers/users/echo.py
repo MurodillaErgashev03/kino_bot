@@ -15,13 +15,14 @@ async def return_film_or_serial(message: types.Message, state: FSMContext):
     user_input = message.text.strip()  # Clean up user input
 
     # First, try to get the film by name or ID
-    film = db.get_film_by_name(user_input)  # Try to search by name first
+    film = db.get_film_by_name(user_input)
 
     if film:
-        kod = film.get('kod')  # Use get to avoid KeyError
-        file_id = film.get('file_id')  # Use get to safely access 'file_id'
+        print(film)  # Check the contents of 'film'
+        kod = film.get('kod')
+        file_id = film.get('file_id')
 
-        if kod and file_id:  # Only proceed if 'kod' and 'file_id' exist
+        if kod and file_id:
             text = (
                 f"⌨️ KOD: #{kod}\n"
                 f"{film['file_name']}\n\n"
