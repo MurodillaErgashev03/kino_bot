@@ -96,7 +96,7 @@ def generate_episode_buttons(episodes, serial_id, page=1, per_page=5):
     row = []
     for ep in episodes[start_index:end_index]:
         button = InlineKeyboardButton(
-            text=f"{ep['episode_number']}-qism",
+            text=f"{ep['episode_number']}-qism ",
             callback_data=f"view_episode_{serial_id}_{ep['episode_number']}"
         )
         row.append(button)
