@@ -16,11 +16,13 @@ async def return_film_or_serial(message: types.Message, state: FSMContext):
     film = db.get_film_by_name(user_input)  # Try to search by name first
 
     if film:
-        text = (
-            f"⌨️ KOD: #{film['kod']}\n"
-            f"{film['file_name']}\n\n"
-            f"📌 @Gold_kinolar_bot "
-        )
+        kod = film.get('kod')  # Use get to avoid KeyError
+        if kod:  # Only proceed if 'kod' exists
+            text = (
+                f"⌨️ KOD: #{kod}\n"
+                f"{film['file_name']}\n\n"
+                f"📌 @Gold_kinolar_bot "
+            )
         await message.answer_video(film['file_id'], caption=text, parse_mode="HTML")
     else:
         # If no film found, search for the serial by name or ID
