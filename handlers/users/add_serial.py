@@ -19,8 +19,10 @@ async def serial_add_start(message: types.Message, state: FSMContext):
 @dp.message(FilmAddStates.waiting_for_serial_name, F.text)
 async def serial_name_add(message: types.Message, state: FSMContext):
     name = message.text.strip()
-    if db.check_code_exists_serial(name):
-        await message.answer("Bu nom allaqachon mavjud. Iltimos, boshqa nom kiriting!")
+    if db.check_code_exists_serial(name):  # Check if serial name already exists
+        await message.answer("Bu nom allaqachon serial sifatida mavjud. Iltimos, boshqa nom kiriting!")
+    elif db.check_code_exists(name):  # Check if film code already exists with the same name
+        await message.answer("Bu nom kinolar kodiga tegishli allaqachon mavjud. Iltimos, boshqa nom kiriting!")
     else:
         await state.update_data({'serial_name': name, 'episodes': []})
         await message.answer("Serial haqida:")

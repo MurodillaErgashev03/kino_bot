@@ -19,12 +19,15 @@ async def film_name_add(message: types.Message, state: FSMContext):
 @dp.message(F.text, FilmAddStates.kod)
 async def film_check_code(message: types.Message, state: FSMContext):
     kod = message.text
-    if db.check_code_exists(kod):
+    if db.check_code_exists(kod):  # Check if the code already exists as a film
         await message.answer("Bu kod allaqachon mavjud. Iltimos, boshqa kod kiriting!")
+    elif db.check_code_exists_serial(kod):  # Check if the code exists as a serial name
+        await message.answer("Bu kod serial nomi sifatida allaqachon mavjud. Iltimos, boshqa kod kiriting!")
     else:
         await state.update_data({'kod': kod})
         await message.answer("Filim nomi :")
         await state.set_state(FilmAddStates.film_name)
+
 
 
 @dp.message(FilmAddStates.film_name)
