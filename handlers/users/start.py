@@ -56,7 +56,7 @@ async def start_bot(message: types.Message, state: FSMContext):
     if await is_user_subscribed(user_id):
         msg = f"""👋 Salom <a href="tg://user?id={user_id}">{message.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://telegram.me/+sbhRwouw7jc0YzBi")]])
+            [InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
         await message.reply(msg, reply_markup=chanel, parse_mode="HTML")
     else:
         await message.answer("⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
@@ -73,7 +73,7 @@ async def oldim(call: CallbackQuery, state: FSMContext):
     if await is_user_subscribed(user_id):
         msg = f"""👋👋 Salom <a href="tg://user?id={user_id}">{call.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://telegram.me/+sbhRwouw7jc0YzBi")]])
+            [InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
         await call.message.answer(msg, reply_markup=chanel, parse_mode="HTML")
     else:
         await call.message.answer("⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
