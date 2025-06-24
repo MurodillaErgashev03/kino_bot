@@ -47,6 +47,6 @@ async def return_film_or_serial(message: types.Message, state: FSMContext):
                     reply_markup=generate_episode_buttons(episodes, serial_id=serial['id'])
                 )
             else:
-                await message.answer(f"Bu serialda hozircha qismlar mavjud emas.")
+                await message.answer(f"Bu serialda hozircha qismlar mavjud emas !")
         else:
             await echo_message(message)
