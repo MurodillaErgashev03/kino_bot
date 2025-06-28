@@ -2,8 +2,7 @@ from datetime import datetime
 
 from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
-from aiogram.fsm.context import FSMContext
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, CallbackQuery
+from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 from keyboards.inline.buttons import subscription_button
 from loader import dp, db, bot
@@ -39,10 +38,8 @@ async def is_user_subscribed(user_id: int) -> bool:
 
 
 @dp.message(CommandStart())
-async def start_bot(message: types.Message, state: FSMContext):
+async def start_bot(message: types.Message):
     user_id = message.from_user.id
-    await state.update_data(user_id=user_id)  # `state` ichida user_id ni saqlaymiz
-
     try:
         user = db.get_user(user_id=user_id)
         if not user:
@@ -54,27 +51,30 @@ async def start_bot(message: types.Message, state: FSMContext):
         print(f"Foydalanuvchini qo'shishda xatolik: {e}")
 
     if await is_user_subscribed(user_id):
-        msg = f"""👋 Salom <a href="tg://user?id={user_id}">{message.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
-        chanel = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
-        await message.reply(msg, reply_markup=chanel, parse_mode="HTML")
+        msg = """👋 Salom 
+
+Marhamat, kerakli kodni yuboring:"""
+        chanel = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
+        await message.reply(msg, reply_markup=chanel)
     else:
-        await message.answer("⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
-                             reply_markup=await subscription_button())
+        await message.answer(
+            "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
+            reply_markup=await subscription_button()
+        )
+
 
 
 @dp.callback_query(lambda c: c.data == "subscribe_true")
-async def oldim(call: CallbackQuery, state: FSMContext):
+async def oldim(call: types.CallbackQuery):
     await call.message.delete()
+    if await is_user_subscribed(call.from_user.id):
+        msg = """👋 Salom 
 
-    data = await state.get_data()
-    user_id = data.get("user_id", call.from_user.id)  # oldindan saqlangan user_id ni olamiz
-
-    if await is_user_subscribed(user_id):
-        msg = f"""👋👋 Salom <a href="tg://user?id={user_id}">{call.from_user.first_name}</a>\nMarhamat, kerakli kodni yuboring:"""
-        chanel = InlineKeyboardMarkup(inline_keyboard=[
-            [InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
-        await call.message.answer(msg, reply_markup=chanel, parse_mode="HTML")
+        Marhamat, kerakli kodni yuboring:"""
+        chanel = InlineKeyboardMarkup(inline_keyboard=[[
+            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
+        await call.message.answer(msg, reply_markup=chanel)
     else:
-        await call.message.answer("⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
+        await call.message.answer("Iltimios! ⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
                                   reply_markup=await subscription_button())
