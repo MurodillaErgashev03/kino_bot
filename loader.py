@@ -11,4 +11,4 @@ db = Database(host=host, user=user, password=password, database=database)
 # loader.py yoki alohida fayl
 async def is_admin(user_id: int) -> bool:
     admin = db.get_admin(user_id)  # `get_admin` metodi adminni tekshiradi
-    return bool(admin)
+    return True if admin else False
