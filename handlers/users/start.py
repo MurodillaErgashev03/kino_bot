@@ -55,7 +55,7 @@ async def start_bot(message: types.Message):
 
 Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/")]])
+            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
         await message.reply(msg, reply_markup=chanel)
     else:
         await message.answer(
