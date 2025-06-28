@@ -55,14 +55,13 @@ async def start_bot(message: types.Message):
 
 Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
+            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/")]])
         await message.reply(msg, reply_markup=chanel)
     else:
         await message.answer(
             "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
             reply_markup=await subscription_button()
         )
-
 
 
 @dp.callback_query(lambda c: c.data == "subscribe_true")

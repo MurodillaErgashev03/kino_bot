@@ -1,3 +1,5 @@
+from datetime import datetime
+
 from aiogram import F, types
 from aiogram.fsm.context import FSMContext
 from keyboards.inline.buttons import generate_episode_buttons
@@ -12,7 +14,19 @@ async def echo_message(message: types.Message):
 # Kino yoki serialni qidirish
 @dp.message(F.text)
 async def return_film_or_serial(message: types.Message, state: FSMContext):
-    user_input = message.text.strip()  # Clean up user input
+    user_input = message.text.strip()
+    user_id = message.from_user.id
+
+    try:
+        user = db.get_user(user_id=user_id)
+        if not user:
+            db.add_user(user_id=message.from_user.id, ban=0, sana=str(datetime.now()), status="1")
+            print(f"Yangi foydalanuvchi qo'shildi: {user_id}")
+        else:
+            print(f"Foydalanuvchi allaqachon mavjud: {user}")
+    except Exception as e:
+        print(f"Foydalanuvchini qo'shishda xatolik: {e}")
+    # Clean up user input
 
     # First, try to get the film by name or ID
     film = db.get_film_by_name(user_input)
