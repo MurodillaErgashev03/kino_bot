@@ -1,197 +1,162 @@
 import mysql.connector
-
-import json  # JSON modullikni import qilamiz
+import json  # json ni import qiling
 
 
 class Database:
-    def __init__(self, host, user, password, database):
+    def __init__(self, host, user, password, db_name):
         self.host = host
         self.user = user
         self.password = password
-        self.database = database
+        self.db_name = db_name
+        self.connection = None  # Connection ni bu yerda None qilib boshlang'ich holatga keltiramiz
 
-    @property
-    def connection(self):
-        return mysql.connector.connect(
-            host=self.host,
-            user=self.user,
-            password=self.password,
-            database=self.database
-        )
+    def connect(self):
+        # Agar connection mavjud bo'lmasa yoki yopilgan bo'lsa, yangisini ochamiz
+        if self.connection is None or not self.connection.is_connected():
+            self.connection = mysql.connector.connect(
+                host=self.host,
+                user=self.user,
+                password=self.password,
+                database=self.db_name
+            )
+
+    def disconnect(self):
+        if self.connection and self.connection.is_connected():
+            self.connection.close()
+            self.connection = None
 
     def execute(self, sql: str, parameters: tuple = None, fetchone=False, fetchall=False, commit=False):
-        if not parameters:
-            parameters = ()
-        connection = self.connection
-        cursor = connection.cursor(dictionary=True)  # dictionary=True bo'lsa, lug'at qaytaradi
-        data = None
-        cursor.execute(sql, parameters)
+        self.connect()  # Har bir so'rovdan oldin ulanishni tekshiramiz va ochamiz
+        cursor = None
+        try:
+            cursor = self.connection.cursor(dictionary=True, buffered=True)  # buffered=True ni qo'shamiz!
+            cursor.execute(sql, parameters)
 
-        if commit:
-            connection.commit()
-        if fetchall:
-            data = cursor.fetchall()
-        if fetchone:
-            data = cursor.fetchone()
+            if commit:
+                self.connection.commit()
+                return None
 
-        cursor.close()
-        connection.close()
-        return data
+            if fetchone:
+                result = cursor.fetchone()
+                return result
 
-    def create_table_admins(self):
+            if fetchall:
+                result = cursor.fetchall()
+                return result
+
+            return None  # Agar fetchone yoki fetchall true bo'lmasa, hech narsa qaytarmaymiz
+
+        except mysql.connector.Error as err:
+            print(f"Xato yuz berdi: {err}")
+            # Xato yuz berganda ham connectionni yopishga urinmaslik uchun pass
+            raise  # Xatoni yuqoriga uzatish
+        finally:
+            if cursor:
+                try:
+                    # Bu yerda asosiy tuzatish: kursor yopilishidan oldin uning natijalarini to'liq iste'mol qilish
+                    # Agar buffered=True bo'lsa, bu avtomatik ravishda bajariladi.
+                    # Lekin xato holatlari uchun yechim
+                    for _ in cursor:  # Qolgan natijalarni o'qib tugatish
+                        pass
+                    cursor.close()
+                except mysql.connector.Error as e:
+                    print(f"Kursor yopishda xato: {e}")
+
+    # ... (qolgan metodlar o'zgarmasdan qoladi)
+
+    def get_user(self, user_id: int):
         sql = """
-              CREATE TABLE IF NOT EXISTS admins \
-              ( \
-                  id \
-                  INT \
-                  AUTO_INCREMENT \
-                  PRIMARY \
-                  KEY, \
-                  user_id \
-                  VARCHAR \
-              ( \
-                  64 \
-              ) NOT NULL,
-                  user_name VARCHAR \
-              ( \
-                  100 \
-              ) NOT NULL
-                  ) CHARSET = utf8mb4; \
-
+              SELECT * \
+              FROM users \
+              WHERE user_id = %s \
               """
-        self.execute(sql, commit=True)
+        user_data = self.execute(sql, parameters=(str(user_id),), fetchone=True)
 
-    def create_table_channel(self):
+        if user_data:
+            # MySQL JSON ustuni ba'zida string qaytarishi mumkin, shuning uchun parse qilamiz
+            if 'join_requests' in user_data and isinstance(user_data['join_requests'], str):
+                try:
+                    user_data['join_requests'] = json.loads(user_data['join_requests'])
+                except json.JSONDecodeError:
+                    user_data['join_requests'] = {}
+            elif 'join_requests' not in user_data or user_data['join_requests'] is None:
+                user_data['join_requests'] = {}
+
+        print(f"DEBUG: get_user - User {user_id} fetched: {user_data}")
+        return user_data
+
+    def update_user_join_requests(self, user_id: int, join_requests: dict):
         sql = """
-              CREATE TABLE IF NOT EXISTS channel \
-              ( \
-                  id \
-                  INT \
-                  AUTO_INCREMENT \
-                  PRIMARY \
-                  KEY, \
-                  chat_id \
-                  VARCHAR \
-              ( \
-                  64 \
-              ) NOT NULL -- chat_id int emas, varchar bo'lishi kerak, chunki ba'zida manfiy va katta sonlar bo'ladi
-                  ) CHARSET = utf8mb3; \
+              UPDATE users \
+              SET join_requests = %s \
+              WHERE user_id = %s \
               """
-        self.execute(sql, commit=True)
+        # JSON obyektini stringga aylantirib saqlaymiz
+        self.execute(sql, parameters=(json.dumps(join_requests), str(user_id)), commit=True)
+        print(f"DEBUG: update_user_join_requests - User {user_id} requests updated to {join_requests}")
 
-    def create_table_data(self):
-        sql = """
-              CREATE TABLE IF NOT EXISTS data \
-              ( \
-                  id \
-                  INT \
-                  AUTO_INCREMENT \
-                  PRIMARY \
-                  KEY, \
-                  file_name \
-                  TEXT \
-                  NOT \
-                  NULL, \
-                  file_id \
-                  TEXT \
-                  NOT \
-                  NULL, \
-                  kod \
-                  TEXT \
-                  NOT \
-                  NULL, \
-                  `all` \
-                  TEXT \
-                  NOT \
-                  NULL
-              ) COLLATE = utf8mb4_general_ci; \
-              """
-        self.execute(sql, commit=True)
+    def add_join_request(self, user_id: int, channel_id: int):
+        user = self.get_user(user_id)
+        if user:
+            # Agar join_requests ustuni bo'lmasa yoki None bo'lsa, bo'sh lug'at bilan boshlaymiz
+            current_requests = user.get('join_requests', {})
+            current_requests[str(channel_id)] = True  # Kanal ID'sini string sifatida saqlaymiz
+            self.update_user_join_requests(user_id, current_requests)
+        else:
+            print(f"ERROR: User {user_id} not found when trying to add join request for channel {channel_id}")
 
-    def create_table_groups(self):
-        sql = """
-              CREATE TABLE IF NOT EXISTS `groups` \
-              ( \
-                  id \
-                  INT \
-                  AUTO_INCREMENT \
-                  PRIMARY \
-                  KEY, \
-                  chat_id \
-                  VARCHAR \
-              ( \
-                  64 \
-              ) NOT NULL
-                  ) CHARSET = utf8mb3; \
-              """
-        self.execute(sql, commit=True)
+    def remove_join_request(self, user_id: int, channel_id: int):
+        user = self.get_user(user_id)
+        if user:
+            current_requests = user.get('join_requests', {})
+            if str(channel_id) in current_requests:
+                del current_requests[str(channel_id)]
+                self.update_user_join_requests(user_id, current_requests)
+        else:
+            print(f"ERROR: User {user_id} not found when trying to remove join request for channel {channel_id}")
 
-    def create_table_kanal(self):
-        sql = """
-              CREATE TABLE IF NOT EXISTS kanal \
-              ( \
-                  id \
-                  INT \
-                  AUTO_INCREMENT \
-                  PRIMARY \
-                  KEY, \
-                  chat_id \
-                  VARCHAR \
-              ( \
-                  64 \
-              ) NOT NULL,
-                  url TEXT NOT NULL
-                  ) CHARSET = utf8mb3; \
-              """
-        self.execute(sql, commit=True)
+    def has_join_request(self, user_id: int, channel_id: int) -> bool:
+        user = self.get_user(user_id)
+        print(
+            f"DEBUG: has_join_request - User {user_id}, Channel {channel_id}. Result: {bool(user and user.get('join_requests', {}).get(str(channel_id)))} , Requests: {user.get('join_requests', {}) if user else 'User not found'}")  # Debug
+        return bool(user and user.get('join_requests', {}).get(str(channel_id)))
 
-    def create_table_sendusers(self):
+    def add_user(self, user_id, ban, sana, status):
         sql = """
-              CREATE TABLE IF NOT EXISTS sendusers \
-              ( \
-                  id \
-                  INT \
-                  AUTO_INCREMENT \
-                  PRIMARY \
-                  KEY, \
-                  mid \
-                  INT \
-                  NOT \
-                  NULL, \
-                  soni \
-                  INT \
-                  NOT \
-                  NULL, \
-                  boshlash_vaqt \
-                  VARCHAR \
-              ( \
-                  50 \
-              ) NOT NULL,
-                  joriy_vaqt VARCHAR \
-              ( \
-                  50 \
-              ) NOT NULL,
-                  status VARCHAR \
-              ( \
-                  50 \
-              ) NOT NULL,
-                  send VARCHAR \
-              ( \
-                  50 \
-              ) NOT NULL,
-                  holat VARCHAR \
-              ( \
-                  50 \
-              ) NOT NULL,
-                  nosend VARCHAR \
-              ( \
-                  250 \
-              ) NOT NULL,
-                  qayerga TEXT NOT NULL,
-                  admin TEXT NOT NULL
-                  ) CHARSET = utf8mb3; \
+              INSERT INTO users (user_id, ban, sana, status, join_requests)
+              VALUES (%s, %s, %s, %s, %s) ON DUPLICATE KEY \
+              UPDATE \
+                  ban = \
+              VALUES (ban), sana = \
+              VALUES (sana), status = \
+              VALUES (status), join_requests = \
+              VALUES (join_requests) \
               """
-        self.execute(sql, commit=True)
+        # Yangi foydalanuvchi qo'shilganda bo'sh JSON obyektini saqlaymiz
+        self.execute(sql, parameters=(user_id, ban, sana, status, json.dumps({})), commit=True)
+        print(f"DEBUG: add_user - User {user_id} added/updated successfully.")
+
+    def get_all_channels(self):
+        sql = "SELECT * FROM kanal"
+        return self.execute(sql, fetchall=True)
+
+    def get_serial_by_title(self, title):
+        sql = "SELECT * FROM serials WHERE title = %s"
+        return self.execute(sql, parameters=(title,), fetchone=True)
+
+    def get_episodes_by_serial_id(self, serial_id):
+        sql = "SELECT * FROM episodes WHERE serial_id = %s ORDER BY episode_number"
+        # Bu yerda ham buffered=True ni hisobga olish kerak
+        return self.execute(sql, parameters=(serial_id,), fetchall=True)
+
+    def get_all_serials_titles(self):
+        sql = "SELECT title FROM serials"
+        serials_titles = self.execute(sql, fetchall=True)
+        return [s['title'] for s in serials_titles] if serials_titles else []
+
+    def get_serials_by_title_part(self, title_part):
+        sql = "SELECT * FROM serials WHERE title LIKE %s"
+        return self.execute(sql, parameters=('%' + title_part + '%',), fetchall=True)
 
     def create_table_users(self):
         sql = """
@@ -205,19 +170,49 @@ class Database:
                   user_id \
                   VARCHAR \
               ( \
-                  64 \
-              ) NOT NULL,
-                  ban INT NOT NULL,
-                  sana TEXT NOT NULL,
-                  status TEXT NOT NULL,
+                  255 \
+              ) UNIQUE,
+                  ban INT DEFAULT 0,
+                  sana VARCHAR \
+              ( \
+                  255 \
+              ),
+                  status VARCHAR \
+              ( \
+                  255 \
+              ),
                   join_requests JSON DEFAULT \
               ( \
                   JSON_OBJECT \
               ( \
-              )) -- Yangi ustun
-                  ) CHARSET = utf8mb3; \
+              ))
+                  ) \
               """
         self.execute(sql, commit=True)
+        print("Table 'users' checked/created successfully with join_requests JSON column.")
+
+    def create_table_kanal(self):
+        sql = """
+              CREATE TABLE IF NOT EXISTS kanal \
+              ( \
+                  id \
+                  INT \
+                  AUTO_INCREMENT \
+                  PRIMARY \
+                  KEY, \
+                  chat_id \
+                  VARCHAR \
+              ( \
+                  255 \
+              ) UNIQUE,
+                  url VARCHAR \
+              ( \
+                  255 \
+              )
+                  ) \
+              """
+        self.execute(sql, commit=True)
+        print("Table 'kanal' checked/created successfully.")
 
     def create_table_serials(self):
         sql = """
@@ -228,22 +223,16 @@ class Database:
                   AUTO_INCREMENT \
                   PRIMARY \
                   KEY, \
-                  serial_name \
+                  title \
                   VARCHAR \
               ( \
                   255 \
-              ) NOT NULL,
-                  serial_title VARCHAR \
-              ( \
-                  255 \
-              ) NOT NULL,
-                  serial_banner VARCHAR \
-              ( \
-                  255 \
-              ) NOT NULL
-                  ) CHARSET = utf8mb3; \
+              ) UNIQUE,
+                  description TEXT
+                  ) \
               """
         self.execute(sql, commit=True)
+        print("Table 'serials' checked/created successfully.")
 
     def create_table_episodes(self):
         sql = """
@@ -255,19 +244,14 @@ class Database:
                   PRIMARY \
                   KEY, \
                   serial_id \
-                  INT \
-                  NOT \
-                  NULL, \
+                  INT, \
                   episode_number \
-                  INT \
-                  NOT \
-                  NULL, \
-                  video_id \
+                  INT, \
+                  file_id \
                   VARCHAR \
               ( \
                   255 \
-              ) NOT NULL,
-                  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+              ),
                   FOREIGN KEY \
               ( \
                   serial_id \
@@ -275,276 +259,118 @@ class Database:
               ( \
                   id \
               ) ON DELETE CASCADE
-                  ) CHARSET=utf8mb3 ENGINE=InnoDB; \
+                  ) \
               """
         self.execute(sql, commit=True)
+        print("Table 'episodes' checked/created successfully.")
 
-    def add_serial(self, serial_name: str, serial_title: str, serial_banner: str):
+    def create_table_admins(self):
         sql = """
-              INSERT INTO serials(serial_name, serial_title, serial_banner) \
-              VALUES (%s, %s, %s) \
+              CREATE TABLE IF NOT EXISTS admins \
+              ( \
+                  id \
+                  INT \
+                  AUTO_INCREMENT \
+                  PRIMARY \
+                  KEY, \
+                  user_id \
+                  VARCHAR \
+              ( \
+                  255 \
+              ) UNIQUE
+                  ) \
               """
-        self.execute(sql, parameters=(serial_name, serial_title, serial_banner), commit=True)
+        self.execute(sql, commit=True)
+        print("Table 'admins' checked/created successfully.")
 
-    def get_serial_id(self, serial_name: str):
-        sql = "SELECT id FROM serials WHERE serial_name = %s"
-        result = self.execute(sql, parameters=(serial_name,), fetchone=True)
-        return result['id'] if result else None
+    def add_admin(self, user_id):
+        sql = "INSERT IGNORE INTO admins (user_id) VALUES (%s)"
+        self.execute(sql, parameters=(str(user_id),), commit=True)
+        print(f"Admin {user_id} added.")
 
-    def get_serial_by_id(self, serial_id: int):
-        sql = """
-              SELECT * \
-              FROM serials \
-              WHERE id = %s \
-              """
-        return self.execute(sql, parameters=(serial_id,), fetchone=True)
-
-    def add_episode(self, serial_id: int, episode_number: int, video_id: str):
-        sql = """
-              INSERT INTO episodes(serial_id, episode_number, video_id) \
-              VALUES (%s, %s, %s) \
-              """
-        self.execute(sql, parameters=(serial_id, episode_number, video_id), commit=True)
-
-    def get_episodes_by_serial_id(self, serial_id: int):
-        sql = """
-              SELECT * \
-              FROM episodes \
-              WHERE serial_id = %s \
-              ORDER BY episode_number \
-              """
-        return self.execute(sql, parameters=(serial_id,))
-
-    def check_code_exists_serial(self, serial_name: str):
-        query = "SELECT EXISTS(SELECT 1 FROM serials WHERE serial_name = %s)"
-        result = self.execute(query, parameters=(serial_name,), fetchone=True)
-        return list(result.values())[0] if result else False
-
-    def get_serial_by_name(self, serial_name: str):
-        sql = "SELECT * FROM serials WHERE serial_name = %s"
-        result = self.execute(sql, parameters=(serial_name,), fetchone=True)
-        return result
-
-    def get_serial(self):
-        sql = "SELECT * FROM serials"
-        return self.execute(sql, fetchall=True)
-
-    # Yuqoridagi get_episodes_by_serial_id dublikat edi, birini olib tashladim.
-    # def get_episodes_by_serial_id(self, serial_id: int):
-    #     sql = "SELECT * FROM episodes WHERE serial_id = %s ORDER BY episode_number"
-    #     result = self.execute(sql, parameters=(serial_id,), fetchall=True)
-    #     return result
-
-    def add_admin(self, user_id: str, user_name: str):
-        sql = """
-              INSERT INTO admins(user_id, user_name) \
-              VALUES (%s, %s) \
-              """
-        self.execute(sql, parameters=(user_id, user_name), commit=True)
-
-    def add_channel(self, chat_id: str):  # chat_id str bo'lishi kerak
-        sql = """
-              INSERT INTO channel(chat_id) \
-              VALUES (%s) \
-              """
-        self.execute(sql, parameters=(chat_id,), commit=True)
-
-    def add_data(self, file_name: str, file_id: str, kod: str, all_data: str):
-        sql = """
-              INSERT INTO data(file_name, file_id, kod, `all`) \
-              VALUES (%s, %s, %s, %s) \
-              """
-        self.execute(sql, parameters=(file_name, file_id, kod, all_data), commit=True)
-
-    def add_group(self, chat_id: str):
-        sql = """
-              INSERT INTO `groups`(chat_id) \
-              VALUES (%s) \
-              """
-        self.execute(sql, parameters=(chat_id,), commit=True)
-
-    def add_kanal(self, chat_id: str, url: str):
-        sql = """
-              INSERT INTO kanal(chat_id, url) \
-              VALUES (%s, %s) \
-              """
-        self.execute(sql, parameters=(chat_id, url), commit=True)
-
-    def delete_kanal(self, chat_id):
-        sql = "DELETE FROM kanal WHERE chat_id = %s"
-        self.execute(sql, parameters=(chat_id,), commit=True)
-
-    def get_all_url(self):
-        sql = "SELECT url FROM kanal"
-        channels = self.execute(sql, fetchall=True)
-        return [channel['url'] for channel in channels]  # Faqat url'ni qaytaradi
-
-    def add_senduser(self, mid: int, soni: int, boshlash_vaqt: str, joriy_vaqt: str, status: str, send: str, holat: str,
-                     nosend: str, qayerga: str, admin: str):
-        sql = """
-              INSERT INTO sendusers(mid, soni, boshlash_vaqt, joriy_vaqt, status, send, holat, nosend, qayerga, admin)
-              VALUES (%s, %s, %s, %s, %s, %s, %s, %s, %s, %s) \
-              """
-        self.execute(sql,
-                     parameters=(mid, soni, boshlash_vaqt, joriy_vaqt, status, send, holat, nosend, qayerga, admin),
-                     commit=True)
-
-    def add_user(self, user_id: str, ban: int, sana: str, status: str):
-        sql = """
-              INSERT INTO users(user_id, ban, sana, status) \
-              VALUES (%s, %s, %s, %s) \
-              """
-        self.execute(sql, parameters=(user_id, ban, sana, status), commit=True)
-
-    def select_all_users(self):
-        sql = """
-              SELECT * \
-              FROM users \
-              """
-        return self.execute(sql, fetchall=True)
-
-    def get_all_channels(self):
-        sql = """
-              SELECT * \
-              FROM kanal \
-              """
-        return self.execute(sql, fetchall=True)
+    def remove_admin(self, user_id):
+        sql = "DELETE FROM admins WHERE user_id = %s"
+        self.execute(sql, parameters=(str(user_id),), commit=True)
+        print(f"Admin {user_id} removed.")
 
     def get_all_admins(self):
-        sql = """
-              SELECT id, user_id, user_name \
-              FROM admins \
-              """
-        return self.execute(sql, fetchall=True)
+        sql = "SELECT user_id FROM admins"
+        admins = self.execute(sql, fetchall=True)
+        return [admin['user_id'] for admin in admins] if admins else []
 
-    def count_users(self):
-        return self.execute("SELECT COUNT(user_id) as total FROM users;", fetchone=True)
+    def is_user_admin(self, user_id):
+        sql = "SELECT COUNT(*) FROM admins WHERE user_id = %s"
+        result = self.execute(sql, parameters=(str(user_id),), fetchone=True)
+        return result['COUNT(*)'] > 0
 
-    def delete_all_users(self):
-        sql = """
-              DELETE \
-              FROM users \
-              WHERE TRUE \
-              """
-        self.execute(sql, commit=True)
+    def add_channel(self, chat_id, url):
+        sql = "INSERT IGNORE INTO kanal (chat_id, url) VALUES (%s, %s)"
+        self.execute(sql, parameters=(str(chat_id), url), commit=True)
+        print(f"Channel {chat_id} added.")
 
-    def get_admin(self, user_id: int):
-        sql = "SELECT * FROM admins WHERE user_id = %s"
-        return self.execute(sql, parameters=(user_id,), fetchone=True)
+    def remove_channel(self, chat_id):
+        sql = "DELETE FROM kanal WHERE chat_id = %s"
+        self.execute(sql, parameters=(str(chat_id),), commit=True)
+        print(f"Channel {chat_id} removed.")
 
-    def get_film_by_id(self, data_id: int):
-        sql = """
-              SELECT * \
-              FROM data \
-              WHERE kod = %s \
-              """
-        return self.execute(sql, parameters=(data_id,), fetchone=True)
+    def get_channel_by_chat_id(self, chat_id):
+        sql = "SELECT * FROM kanal WHERE chat_id = %s"
+        return self.execute(sql, parameters=(str(chat_id),), fetchone=True)
 
-    def get_film_by_name(self, kod: int):
-        sql = """
-              SELECT file_name, file_id, kod \
-              FROM data \
-              WHERE kod = %s \
-              """
-        return self.execute(sql, parameters=(kod,), fetchone=True)
+    def add_serial(self, title, description):
+        sql = "INSERT IGNORE INTO serials (title, description) VALUES (%s, %s)"
+        self.execute(sql, parameters=(title, description), commit=True)
+        print(f"Serial '{title}' added.")
 
-    def get_user(self, user_id: int):
-        sql = """
-        SELECT * FROM users WHERE user_id = %s
-        """
-        user_data = self.execute(sql, parameters=(str(user_id),), fetchone=True)
-        # Agar user topilsa va join_requests ustuni bo'lsa, uni JSON formatida qaytarishga harakat qilamiz
-        if user_data and 'join_requests' in user_data and isinstance(user_data['join_requests'], str):
-            try:
-                user_data['join_requests'] = json.loads(user_data['join_requests'])
-            except json.JSONDecodeError:
-                user_data['join_requests'] = {} # Xato bo'lsa, bo'sh lug'at
-        return user_data
+    def update_serial(self, serial_id, title=None, description=None):
+        updates = []
+        params = []
+        if title:
+            updates.append("title = %s")
+            params.append(title)
+        if description:
+            updates.append("description = %s")
+            params.append(description)
 
-    def add_film_data(self, file_name: str, file_id: str, kod: str, all_data: str):
-        sql = """
-              INSERT INTO data(file_name, file_id, kod, `all`) \
-              VALUES (%s, %s, %s, %s) \
-              """
-        self.execute(sql, parameters=(file_name, file_id, kod, all_data), commit=True)
+        if not updates:
+            print("No updates provided for serial.")
+            return
 
-    def get_all_data(self):
-        sql = """
-              SELECT * \
-              FROM data \
-              """
-        return self.execute(sql, fetchall=True)
+        sql = f"UPDATE serials SET {', '.join(updates)} WHERE id = %s"
+        params.append(serial_id)
+        self.execute(sql, parameters=tuple(params), commit=True)
+        print(f"Serial {serial_id} updated.")
 
-    def check_code_exists(self, kod):
-        query = "SELECT EXISTS(SELECT 1 FROM data WHERE kod = %s)"
-        result = self.execute(query, parameters=(kod,), fetchone=True)
-        return list(result.values())[0]
+    def remove_serial(self, serial_id):
+        sql = "DELETE FROM serials WHERE id = %s"
+        self.execute(sql, parameters=(serial_id,), commit=True)
+        print(f"Serial {serial_id} removed.")
 
-    def delete_film_id(self, kod):
-        sql = """
-              DELETE \
-              FROM data \
-              WHERE kod = %s"""
-        return self.execute(sql, parameters=(kod,), commit=True)
+    def add_episode(self, serial_id, episode_number, file_id):
+        sql = "INSERT INTO episodes (serial_id, episode_number, file_id) VALUES (%s, %s, %s)"
+        self.execute(sql, parameters=(serial_id, episode_number, file_id), commit=True)
+        print(f"Episode {episode_number} for serial {serial_id} added.")
 
-    def delete_admin_id(self, user_id):
-        sql = """
-              DELETE \
-              FROM admins \
-              WHERE user_id = %s"""
-        return self.execute(sql, parameters=(user_id,), commit=True)
+    def update_episode(self, episode_id, episode_number=None, file_id=None):
+        updates = []
+        params = []
+        if episode_number:
+            updates.append("episode_number = %s")
+            params.append(episode_number)
+        if file_id:
+            updates.append("file_id = %s")
+            params.append(file_id)
 
-    def delete_serial_by_name(self, serial_name: str):
-        sql = "DELETE FROM serials WHERE serial_name = %s"
-        self.execute(sql, parameters=(serial_name,), commit=True)
+        if not updates:
+            print("No updates provided for episode.")
+            return
 
-    # --- YANGI QO'SHILGAN METODLAR ---
-    def add_join_request(self, user_id: int, channel_id: int):
-        user = self.get_user(user_id) # Bu yerda get_user yangilangan versiyasidan foydalanamiz
-        current_requests = user.get('join_requests', {}) if user else {} # Agar user mavjud bo'lmasa, bo'sh lug'at
+        sql = f"UPDATE episodes SET {', '.join(updates)} WHERE id = %s"
+        params.append(episode_id)
+        self.execute(sql, parameters=tuple(params), commit=True)
+        print(f"Episode {episode_id} updated.")
 
-        channel_id_str = str(channel_id)
-        if channel_id_str not in current_requests:
-            current_requests[channel_id_str] = True
-            sql = "UPDATE users SET join_requests = %s WHERE user_id = %s"
-            self.execute(sql, parameters=(json.dumps(current_requests), str(user_id)), commit=True)
-            print(f"DEBUG: add_join_request - User {user_id}, Channel {channel_id} added. Current requests: {current_requests}") # Debug
-        else:
-            print(f"DEBUG: add_join_request - User {user_id}, Channel {channel_id} already has a request.") # Debug
-
-    def remove_join_request(self, user_id: int, channel_id: int):
-        user = self.get_user(user_id)
-        current_requests = user.get('join_requests', {}) if user else {}
-
-        channel_id_str = str(channel_id)
-        if channel_id_str in current_requests:
-            del current_requests[channel_id_str]
-            sql = "UPDATE users SET join_requests = %s WHERE user_id = %s"
-            self.execute(sql, parameters=(json.dumps(current_requests), str(user_id)), commit=True)
-            print(
-                f"DEBUG: remove_join_request - User {user_id}, Channel {channel_id} removed. Current requests: {current_requests}")  # Debug
-        else:
-            print(f"DEBUG: remove_join_request - User {user_id}, Channel {channel_id} not found in requests.")  # Debug
-
-    def has_join_request(self, user_id: int, channel_id: int) -> bool:
-        user = self.get_user(user_id)  # Bu yerda get_user yangilangan versiyasidan foydalanamiz
-        if not user or not user.get('join_requests'):
-            print(f"DEBUG: has_join_request - User {user_id} or join_requests not found. Returning False.")  # Debug
-            return False
-
-        join_requests = user['join_requests']  # Bu yerda u allaqachon lug'at bo'lishi kerak
-
-        channel_id_str = str(channel_id)
-        result = channel_id_str in join_requests and join_requests[channel_id_str]
-        print(
-            f"DEBUG: has_join_request - User {user_id}, Channel {channel_id}. Result: {result}, Requests: {join_requests}")  # Debug
-        return result
-
-
-def logger(statement):
-    print(f"""
-_____________________________________________________        
-Executing: 
-{statement}
-_____________________________________________________
-""")
+    def remove_episode(self, episode_id):
+        sql = "DELETE FROM episodes WHERE id = %s"
+        self.execute(sql, parameters=(episode_id,), commit=True)
+        print(f"Episode {episode_id} removed.")
