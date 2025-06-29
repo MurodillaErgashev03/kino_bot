@@ -307,13 +307,9 @@ class Database:
         self.execute(sql, parameters=(serial_id, episode_number, video_id), commit=True)
 
     def get_episodes_by_serial_id(self, serial_id: int):
-        sql = """
-              SELECT * \
-              FROM episodes \
-              WHERE serial_id = %s \
-              ORDER BY episode_number \
-              """
-        return self.execute(sql, parameters=(serial_id,))
+        sql = "SELECT * FROM episodes WHERE serial_id = %s ORDER BY episode_number"
+        result = self.execute(sql, parameters=(serial_id,), fetchall=True)
+        return result
 
     def check_code_exists_serial(self, serial_name: str):
         query = "SELECT EXISTS(SELECT 1 FROM serials WHERE serial_name = %s)"
