@@ -1,6 +1,3 @@
-#users/majburiy_obuna.py
-
-
 from mailbox import Message
 
 from aiogram.fsm.context import FSMContext
@@ -28,24 +25,19 @@ async def add_channel(message: types.Message, state: FSMContext):
 
 
 @dp.message(FilmAddStates.chat_id, F.forward_from_chat)
-async def process_forwarded_message(message: types.Message, state: FSMContext):  # Message tipini to'g'irladim
-
-    if message.forward_from_chat.type in ["channel", "group", "supergroup"]:
+async def process_forwarded_message(message: Message, state: FSMContext):
+    if message.forward_from_chat.type == "channel":
         channel_id = message.forward_from_chat.id
         channel_username = message.forward_from_chat.username
-
-        # Guruhlar uchun username bo'lmasligi mumkin, shuning uchun link so'raymiz
         if not channel_username:
-            await message.answer("Bu yopiq kanal yoki guruh. Iltimos, unga taklif havolasini (invite link) yuboring!")
+            await message.answer("Bu yopiq kanal. Iltimos, kanal havolasini yuboring !")
             await state.update_data(channel_id=channel_id)
             await state.set_state(FilmAddStates.waiting_for_channel_link)
         else:
-            db.add_kanal(channel_id, "https://t.me/" + channel_username)
-            await message.answer(
-                f"✅ Kanal/guruh muvaffaqiyatli qo'shildi!\nID: {channel_id}\nUsername: @{channel_username}")
-            await state.clear()  # holatni tozalash
+            db.add_kanal(channel_id,"https://t.me/" +channel_username  )
+            await message.answer(f"Kanal qo'shildi!\nKanal ID: {channel_id}\nUsername: @{channel_username}")
     else:
-        await message.answer("Iltimos, faqat kanal yoki guruhdan xabar forward qiling.")
+        await message.answer("Iltimos, kanaldan xabar forward qiling.")
 
 
 @dp.message(FilmAddStates.waiting_for_channel_link)

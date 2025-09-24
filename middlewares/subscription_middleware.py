@@ -1,5 +1,3 @@
-#middlewase/subscription_middleware.py
-
 import time
 from datetime import datetime
 from typing import Any, Awaitable, Callable, cast, Dict
@@ -24,24 +22,16 @@ class UserCheckMiddleware(BaseMiddleware):
             event: TelegramObject,
             data: Dict[str, Any]
     ) -> Any:
+        # Update obyektini Message obyektiga aylantirishga urinish
+        # Chunki bizga event.message kerak. Agar event Message emas, boshqa tur bo'lsa (masalan, CallbackQuery),
+        # bu yerda xatolik bo'lmasligi uchun tekshiramiz.
+        message = event.message  # Message obyektini to'g'ridan-to'g'ri event.message dan olamiz
 
-        # event (yangilanish) Message yoki CallbackQuery ekanligini tekshiramiz
-        if isinstance(event, Message):
-            message = event
-        elif isinstance(event, types.CallbackQuery):
-            message = event.message
-        else:
-            # Agar boshqa turdagi yangilanish bo'lsa (masalan ChatJoinRequest),
-            # tekshiruvsiz keyingi qatlamga o'tkazib yuboramiz.
-            return await handler(event, data)
-
-        # Agar message bo'sh bo'lsa (kamdan-kam holat), davom etamiz
-        if not message:
+        if not message:  # Agar xabar mavjud bo'lmasa (masalan, bu callback_query bo'lsa), keyingi handlerga o'tamiz
             return await handler(event, data)
 
         user_id = message.from_user.id
 
-        # ... (qolgan kodlaringiz o'zgarishsiz qoladi)
         # 1. Foydalanuvchini bazaga saqlash/yangilash mantig'i
         try:
             user = db.get_user(user_id=user_id)
@@ -59,12 +49,11 @@ class UserCheckMiddleware(BaseMiddleware):
         # 2. Obuna holatini tekshirish mantig'i
         unsubscribed_channels = await get_unsubscribed_channels(user_id)
 
-        if unsubscribed_channels:
-            # ... (qolgan kodlaringiz o'zgarishsiz qoladi)
+        if unsubscribed_channels:  # Agar ro'yxat bo'sh bo'lmasa, demak obuna bo'lishi kerak
             subscribe_buttons = []
             for i, channel_info in enumerate(unsubscribed_channels):
                 channel_name = f"{i + 1}-kanal"
-                if channel_info.get('url') and channel_info['url'] != '#':
+                if channel_info.get('url') and channel_info['url'] != '#':  # .get() bilan url ni olish
                     subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=channel_info['url'])])
                 else:
                     subscribe_buttons.append([InlineKeyboardButton(text=channel_name,
@@ -72,10 +61,10 @@ class UserCheckMiddleware(BaseMiddleware):
 
             subscribe_buttons.append([InlineKeyboardButton(text="Obuna bo'ldim ✅", callback_data="subscribe_true")])
 
-            await message.answer(
+            await message.answer(  # event.message o'rniga to'g'ridan-to'g'ri message dan foydalanamiz
                 "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling (agar maxfiy kanal bo'lsa, qo'shilish so'rovini yuboring):",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons)
             )
-            return
+            return  # Agar obuna bo'lmagan bo'lsa, keyingi handlerga o'tishni to'xtatamiz
 
         return await handler(event, data)
