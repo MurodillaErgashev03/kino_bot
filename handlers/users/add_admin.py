@@ -30,15 +30,17 @@ async def add_admin(message: types.Message, state: FSMContext):
 
 @dp.message(FilmAddStates.admin_chat_id)
 async def add_admin(message: types.Message,state:FSMContext):
-    if message.from_user:
+    if message.forward_from:
         admin_chat_id = message.forward_from.id
         admin_name = message.forward_from.full_name
 
-        db.add_admin(admin_chat_id,admin_name)  # Bu yerda ma'lumotlar bazasiga saqlash kerak
+        db.add_admin(admin_chat_id, admin_name)
 
-        await message.answer(f"{admin_name}\nID: {admin_chat_id} admin sifatida qo'shildi!")
+        await message.answer(f"✅ {admin_name}\n<b>ID:</b> <code>{admin_chat_id}</code> admin sifatida qo'shildi!")
+        await state.clear()
     else:
-        await message.answer("Foydalanuvchini aniqlab bo'lmadi.")
+        await message.answer(
+            "❌ Xatolik: Iltimos, faqat foydalanuvchi profilidan xabar forward qiling.\n\nKanaldan yoki maxfiyligini sozlagan foydalanuvchidan forward qilib bo'lmaydi.")
 
 
 @dp.message(F.text == "➖ Admin o'chrish", IsBotAdmin())
