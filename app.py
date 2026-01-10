@@ -38,11 +38,6 @@ async def main():
             print(e)
 
         try:
-            db.create_table_admins()
-        except Exception as e:
-            print(e)
-
-        try:
             db.create_table_serials()
         except Exception as e:
             print(e)
@@ -51,6 +46,7 @@ async def main():
             db.create_table_episodes()
         except Exception as e:
             print(e)
+
 
 
         await dp.start_polling(bot)
