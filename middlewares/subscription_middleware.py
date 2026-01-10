@@ -1,6 +1,7 @@
 import time
 from datetime import datetime
 from typing import Any, Awaitable, Callable, cast, Dict
+from aiogram.enums import ChatType
 
 from aiogram import BaseMiddleware
 from aiogram.types import TelegramObject, Update, InlineKeyboardMarkup, InlineKeyboardButton, \
@@ -29,6 +30,9 @@ class UserCheckMiddleware(BaseMiddleware):
 
         if not message:  # Agar xabar mavjud bo'lmasa (masalan, bu callback_query bo'lsa), keyingi handlerga o'tamiz
             return await handler(event, data)
+
+        if message.chat.type != ChatType.PRIVATE:
+            return
 
         user_id = message.from_user.id
 
