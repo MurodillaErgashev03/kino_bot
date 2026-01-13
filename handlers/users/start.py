@@ -89,7 +89,7 @@ async def start_bot(message: types.Message):
 
 Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
+            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/darkvayb")]])
         await message.reply(msg, reply_markup=chanel)
     else:
         subscribe_buttons = []
@@ -127,7 +127,7 @@ async def oldim(call: types.CallbackQuery):
 
         Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
+            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/darkvayb")]])
         await call.message.answer(msg, reply_markup=chanel)
     else:
         # Agar hali ham obuna bo'lishi kerak bo'lgan kanallar bo'lsa,
@@ -176,7 +176,7 @@ async def check_single_channel_subscription(call: types.CallbackQuery):
 
         Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
-            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/kinomzal")]])
+            InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/darkvayb")]])
         await call.message.answer(msg, reply_markup=chanel)
         await call.message.delete()  # Eski xabarni o'chirish
     else:
