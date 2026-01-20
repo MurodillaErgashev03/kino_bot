@@ -74,7 +74,7 @@ async def list_channels(message: types.Message):
         )
         await message.answer(f"Majburiy kanallar:\n\n{channels_text}")
     else:
-        await message.answer("Majburiy kanallar qo'shilmagan.")
+        await message.answer("Majburiy kanallar qo'shilmagan")
 
 
 
