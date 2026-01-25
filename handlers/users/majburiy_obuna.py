@@ -3,7 +3,7 @@ from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery, Message
 
 from filters import IsBotAdmin
-from keyboards.inline.buttons import delete_channel_button
+from keyboards.inline.buttons import delete_channel_button, channel_detail_buttons, view_channels_paginated
 from loader import dp, db, bot
 from aiogram import types, F
 
@@ -447,41 +447,125 @@ async def process_channel_deletion(callback_query: CallbackQuery):
 
 
 @dp.message(F.text == "👁‍🗨 Majburiy kanallarni ko'rish", IsBotAdmin())
-async def list_channels(message: types.Message):
-    channels = db.get_all_channels()
-    if channels:
-        # Type bo'yicha guruhlash
-        channel_list = []
-        group_list = []
-        instagram_list = []
-
-        for item in channels:
-            url = item['url']
-            item_type = item.get('type', 'channel')
-
-            if item_type == 'channel':
-                channel_list.append(url)
-            elif item_type == 'group':
-                group_list.append(url)
-            elif item_type == 'instagram':
-                instagram_list.append(url)
-
-        result_text = "📋 Majburiy obunalar ro'yxati:\n\n"
-
-        if channel_list:
-            result_text += "📢 Kanallar:\n"
-            result_text += "\n".join([f"• {url}" for url in channel_list])
-            result_text += "\n\n"
-
-        if group_list:
-            result_text += "👥 Guruhlar:\n"
-            result_text += "\n".join([f"• {url}" for url in group_list])
-            result_text += "\n\n"
-
-        if instagram_list:
-            result_text += "📸 Instagram akkauntlar:\n"
-            result_text += "\n".join([f"• {url}" for url in instagram_list])
-
-        await message.answer(result_text)
-    else:
+async def list_channels_paginated(message: types.Message):
+    total = db.count_channels()
+    if total == 0:
         await message.answer("Majburiy obunalar qo'shilmagan")
+        return
+
+    await message.answer(
+        "📋 Majburiy obunalar ro'yxati:\n\n"
+        "Kanal ustiga bosing va sozlamalarini o'zgartiring:",
+        reply_markup=await view_channels_paginated(page=1)
+    )
+
+
+@dp.callback_query(lambda c: c.data.startswith('ch_page_'))
+async def paginate_channels(callback_query: CallbackQuery):
+    """Sahifalar orasida o'tish"""
+    page = int(callback_query.data.split('_')[2])
+
+    await callback_query.message.edit_text(
+        "📋 Majburiy obunalar ro'yxati:\n\n"
+        "Kanal ustiga bosing va sozlamalarini o'zgartiring:",
+        reply_markup=await view_channels_paginated(page=page)
+    )
+    await callback_query.answer()
+
+
+@dp.callback_query(lambda c: c.data.startswith('view_ch_'))
+async def show_channel_details(callback_query: CallbackQuery):
+    """Kanal tafsilotlarini ko'rsatish"""
+    # view_ch_{chat_id} dan chat_id ni olish
+    chat_id = callback_query.data.replace('view_ch_', '')
+
+    channels = db.get_all_channels()
+    channel_info = None
+
+    for ch in channels:
+        if ch['chat_id'] == chat_id:
+            channel_info = ch
+            break
+
+    if not channel_info:
+        await callback_query.answer("Kanal topilmadi!")
+        return
+
+    level = channel_info.get('level', 'primary')
+    level_text = "1-darajali (Asosiy)" if level == 'primary' else "2-darajali (Qo'shimcha)"
+    type_text = {"channel": "Kanal", "group": "Guruh", "instagram": "Instagram"}.get(
+        channel_info.get('type', 'channel'), 'Kanal'
+    )
+
+    text = (
+        f"📊 {type_text} ma'lumotlari:\n\n"
+        f"🔗 Link: {channel_info['url']}\n"
+        f"📍 Daraja: {level_text}\n"
+        f"🆔 Chat ID: {chat_id}\n\n"
+        f"Darajani o'zgartiring:"
+    )
+
+    await callback_query.message.edit_text(
+        text,
+        reply_markup=await channel_detail_buttons(chat_id)
+    )
+    await callback_query.answer()
+
+
+@dp.callback_query(lambda c: c.data.startswith('set_lvl_'))
+async def change_channel_level(callback_query: CallbackQuery):
+    """Kanal darajasini o'zgartirish"""
+    parts = callback_query.data.split('_')
+    new_level = parts[2]  # primary yoki secondary
+    chat_id = '_'.join(parts[3:])  # chat_id
+
+    # Bazada yangilash
+    db.update_channel_level(chat_id, new_level)
+
+    level_text = "1-darajali" if new_level == 'primary' else "2-darajali"
+
+    await callback_query.answer(f"✅ Daraja o'zgartirildi: {level_text}")
+
+    # Yangilangan ma'lumotlarni ko'rsatish
+    channels = db.get_all_channels()
+    channel_info = None
+
+    for ch in channels:
+        if ch['chat_id'] == chat_id:
+            channel_info = ch
+            break
+
+    if channel_info:
+        type_text = {"channel": "Kanal", "group": "Guruh", "instagram": "Instagram"}.get(
+            channel_info.get('type', 'channel'), 'Kanal'
+        )
+
+        text = (
+            f"📊 {type_text} ma'lumotlari:\n\n"
+            f"🔗 Link: {channel_info['url']}\n"
+            f"📍 Daraja: {level_text}\n"
+            f"🆔 Chat ID: {chat_id}\n\n"
+            f"Darajani o'zgartiring:"
+        )
+
+        await callback_query.message.edit_text(
+            text,
+            reply_markup=await channel_detail_buttons(chat_id)
+        )
+
+
+@dp.callback_query(lambda c: c.data == 'back_to_ch_list')
+async def back_to_channels_list(callback_query: CallbackQuery):
+    """Kanallar ro'yxatiga qaytish"""
+    await callback_query.message.edit_text(
+        "📋 Majburiy obunalar ro'yxati:\n\n"
+        "Kanal ustiga bosing va sozlamalarini o'zgartiring:",
+        reply_markup=await view_channels_paginated(page=1)
+    )
+    await callback_query.answer()
+
+
+@dp.callback_query(lambda c: c.data == 'ignore')
+async def ignore_callback(callback_query: CallbackQuery):
+    """Sahifa raqami tugmasini ignore qilish"""
+    await callback_query.answer()

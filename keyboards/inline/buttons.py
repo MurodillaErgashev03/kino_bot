@@ -164,3 +164,101 @@ async def add_episode_button():
         inline_keyboard.append([tugma])
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+
+# keyboards/inline/buttons.py
+
+async def view_channels_paginated(page: int = 1, per_page: int = 10):
+    """Kanallarni paginated ko'rsatish"""
+    offset = (page - 1) * per_page
+    items = db.get_channels_paginated(offset, per_page)
+    total = db.count_channels()
+    total_pages = (total + per_page - 1) // per_page
+
+    inline_keyboard = []
+
+    for item in items:
+        item_type = item.get('type', 'channel')
+        level = item.get('level', 'primary')
+        url = item['url']
+
+        # Level emoji
+        level_emoji = "1️⃣" if level == 'primary' else "2️⃣"
+
+        # Type emoji
+        if item_type == 'instagram':
+            username = url.split('/')[-2] if url.endswith('/') else url.split('/')[-1]
+            text = f"{level_emoji} 📸 {username}"
+        elif item_type == 'group':
+            text = f"{level_emoji} 👥 Guruh"
+        else:
+            text = f"{level_emoji} 📢 Kanal"
+
+        inline_keyboard.append([
+            InlineKeyboardButton(
+                text=text,
+                callback_data=f"view_ch_{item['chat_id']}"
+            )
+        ])
+
+    # Pagination tugmalari
+    nav_buttons = []
+    if page > 1:
+        nav_buttons.append(
+            InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"ch_page_{page - 1}")
+        )
+    if page < total_pages:
+        nav_buttons.append(
+            InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"ch_page_{page + 1}")
+        )
+
+    if nav_buttons:
+        inline_keyboard.append(nav_buttons)
+
+    # Sahifa raqami
+    inline_keyboard.append([
+        InlineKeyboardButton(text=f"📄 {page}/{total_pages}", callback_data="ignore")
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+
+async def channel_detail_buttons(chat_id: str):
+    """Kanal tafsilotlari va sozlamalar"""
+    channels = db.get_all_channels()
+    channel_info = None
+
+    for ch in channels:
+        if ch['chat_id'] == chat_id:
+            channel_info = ch
+            break
+
+    if not channel_info:
+        return None
+
+    current_level = channel_info.get('level', 'primary')
+
+    keyboard = []
+
+    # Level o'zgartirish tugmalari
+    if current_level == 'primary':
+        keyboard.append([
+            InlineKeyboardButton(
+                text="⬆️ 2-darajali qilish",
+                callback_data=f"set_lvl_secondary_{chat_id}"
+            )
+        ])
+    else:
+        keyboard.append([
+            InlineKeyboardButton(
+                text="⬇️ 1-darajali qilish",
+                callback_data=f"set_lvl_primary_{chat_id}"
+            )
+        ])
+
+    # Orqaga tugma
+    keyboard.append([
+        InlineKeyboardButton(text="🔙 Orqaga", callback_data="back_to_ch_list")
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)

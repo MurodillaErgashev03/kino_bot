@@ -14,9 +14,12 @@ from aiogram import types
 
 async def get_unsubscribed_channels(user_id: int) -> list:
     """
-    Foydalanuvchi obuna bo'lmagan yoki so'rov yubormagan kanallar ro'yxatini qaytaradi.
+    User uchun obuna bo'lishi kerak bo'lgan kanallarni qaytaradi.
 
-    Instagram akkauntlar faqat barcha telegram kanallarga obuna bo'lmaganida ko'rinadi!
+    Mantiq:
+    1. Yangi user -> faqat PRIMARY kanallar
+    2. PRIMARY tugallagan -> 1-2 soat kutadi
+    3. 1-2 soat o'tgandan keyin -> SECONDARY kanallar
     """
 
     if await is_admin(user_id):
@@ -28,76 +31,99 @@ async def get_unsubscribed_channels(user_id: int) -> list:
     if not all_items:
         return []
 
-    # Telegram kanallar va Instagram akkauntlarni ajratish
-    telegram_items = [item for item in all_items if item.get('type', 'channel') in ['channel', 'group']]
-    instagram_items = [item for item in all_items if item.get('type', 'channel') == 'instagram']
-
-    all_telegram_subscribed = True  # Barcha telegram kanallarga obuna bo'lganmi?
+    # User ma'lumotlarini olish
+    user = db.get_user(user_id)
+    user_subscription_level = user.get('subscription_level', 'none') if user else 'none'
+    last_check_time = user.get('last_check_time') if user else None
 
     print(f"\n{'=' * 50}")
-    print(f"DEBUG: get_unsubscribed_channels - User {user_id}")
-    print(f"DEBUG: Jami telegram kanallar: {len(telegram_items)}")
-    print(f"DEBUG: Jami instagram: {len(instagram_items)}")
+    print(f"DEBUG: User {user_id}")
+    print(f"  - Subscription level: {user_subscription_level}")
+    print(f"  - Last check time: {last_check_time}")
 
-    # FAQAT TELEGRAM KANALLARNI TEKSHIRISH
+    # LEVEL bo'yicha filtrlash
+    if user_subscription_level == 'none':
+        # Yangi user - faqat PRIMARY kanallar
+        items_to_check = [item for item in all_items if item.get('level', 'primary') == 'primary']
+        target_level = 'primary'
+        print(f"  - Yangi user -> PRIMARY kanallar ({len(items_to_check)} ta)")
+
+    elif user_subscription_level == 'primary':
+        # PRIMARY tugallangan - vaqtni tekshirish
+        if last_check_time:
+            # String ni datetime ga aylantirish
+            if isinstance(last_check_time, str):
+                try:
+                    last_check_time = datetime.strptime(last_check_time, '%Y-%m-%d %H:%M:%S')
+                except:
+                    last_check_time = None
+
+            if last_check_time:
+                # 1-2 soat o'tganini tekshirish (1 soat = 3600 sekund)
+                time_passed = datetime.now() - last_check_time
+                hours_passed = time_passed.total_seconds() / 3600
+
+                print(f"  - PRIMARY tugallangan: {hours_passed:.2f} soat oldin")
+
+                if hours_passed >= 1:  # 1 soat o'tgan
+                    # SECONDARY kanallarni ko'rsatish
+                    items_to_check = [item for item in all_items if item.get('level', 'primary') == 'secondary']
+                    target_level = 'secondary'
+                    print(f"  - 1 soat o'tgan -> SECONDARY kanallar ({len(items_to_check)} ta)")
+                else:
+                    # Hali vaqt yo'q
+                    print(f"  - Hali {1 - hours_passed:.2f} soat kutish kerak")
+                    return []
+            else:
+                # Vaqt noma'lum - SECONDARY ni ko'rsatish
+                items_to_check = [item for item in all_items if item.get('level', 'primary') == 'secondary']
+                target_level = 'secondary'
+        else:
+            # Vaqt yo'q - SECONDARY ni ko'rsatish
+            items_to_check = [item for item in all_items if item.get('level', 'primary') == 'secondary']
+            target_level = 'secondary'
+
+    else:
+        # Hammasi tugallangan
+        print(f"  - Barcha darajalar tugallangan")
+        return []
+
+    # Telegram va Instagram ajratish
+    telegram_items = [item for item in items_to_check if item.get('type', 'channel') in ['channel', 'group']]
+    instagram_items = [item for item in items_to_check if item.get('type', 'channel') == 'instagram']
+
+    all_telegram_subscribed = True
+
+    # Telegram kanallarni tekshirish
     for item in telegram_items:
         channel_id_str = item['chat_id']
         channel_url = item.get('url', '#')
         channel_type = item.get('type', 'channel')
 
-        print(f"  - Tekshirilmoqda: {channel_id_str} (type: {channel_type})")
-
-        # PRIVATE KANAL/GURUH TEKSHIRUVI
-        if channel_id_str.startswith('private_'):
-            user = db.get_user(user_id)
-            join_requests = user.get('join_requests', {}) if user else {}
-            is_satisfied = len(join_requests) > 0
-
-            if is_satisfied:
-                print(f"    ✅ Private - Join request tashlagan")
-            else:
-                channels_to_subscribe.append({
-                    'chat_id': channel_id_str,
-                    'url': channel_url,
-                    'type': channel_type
-                })
-                all_telegram_subscribed = False
-                print(f"    ❌ Private - Join request YO'Q")
-
-            continue
-
-        # ODDIY KANAL/GURUH TEKSHIRUVI
         try:
             channel_id_int = int(channel_id_str)
         except ValueError:
-            print(f"Xato: Noto'g'ri ID: {channel_id_str}")
             continue
 
         is_satisfied = False
 
         try:
             chat_member = await bot.get_chat_member(chat_id=channel_id_int, user_id=user_id)
-            print(f"    Status: {chat_member.status}")
 
             if chat_member.status in ['member', 'administrator', 'creator']:
                 is_satisfied = True
-                print(f"    ✅ OBUNA BO'LGAN")
                 if db.has_join_request(user_id, channel_id_int):
                     db.remove_join_request(user_id, channel_id_int)
+
             elif db.has_join_request(user_id, channel_id_int):
                 is_satisfied = True
-                print(f"    ✅ JOIN REQUEST TASHLAGAN")
 
-        except TelegramBadRequest as e:
-            print(f"    TelegramBadRequest: {e}")
+        except TelegramBadRequest:
             if db.has_join_request(user_id, channel_id_int):
                 is_satisfied = True
-                print(f"    ✅ JOIN REQUEST TASHLAGAN")
-        except Exception as e:
-            print(f"    Xato: {e}")
+        except Exception:
             if db.has_join_request(user_id, channel_id_int):
                 is_satisfied = True
-                print(f"    ✅ JOIN REQUEST TASHLAGAN")
 
         if not is_satisfied:
             channels_to_subscribe.append({
@@ -106,9 +132,8 @@ async def get_unsubscribed_channels(user_id: int) -> list:
                 'type': channel_type
             })
             all_telegram_subscribed = False
-            print(f"    ❌ Obuna/Request YO'Q")
 
-    # INSTAGRAM MANTIQ: Faqat telegram kanallarga obuna BO'LMAGAN bo'lsa ko'rsat
+    # Instagram mantiq
     if not all_telegram_subscribed:
         for insta in instagram_items:
             channels_to_subscribe.append({
@@ -116,11 +141,13 @@ async def get_unsubscribed_channels(user_id: int) -> list:
                 'url': insta['url'],
                 'type': 'instagram'
             })
-            print(f"  📸 Instagram qo'shildi: {insta['url']}")
-    else:
-        print(f"  ✅ Barcha telegram kanallarga obuna - Instagram ko'rsatilmaydi")
 
-    print(f"DEBUG: Jami obuna bo'lmagan: {len(channels_to_subscribe)}")
+    # Agar barcha telegram kanallarga obuna bo'lgan bo'lsa, user level ni yangilash
+    if all_telegram_subscribed and len(telegram_items) > 0:
+        db.update_user_subscription_level(user_id, target_level)
+        print(f"DEBUG: ✅ User level yangilandi: {target_level}")
+
+    print(f"DEBUG: Obuna bo'lishi kerak: {len(channels_to_subscribe)} ta")
     print(f"{'=' * 50}\n")
 
     return channels_to_subscribe

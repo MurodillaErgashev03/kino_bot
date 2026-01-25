@@ -141,8 +141,15 @@ class Database:
                   64 \
               ) NOT NULL,
                   url TEXT NOT NULL,
-                  type VARCHAR(20) DEFAULT 'channel' NOT NULL
-                  ) CHARSET = utf8mb3; \
+                  type VARCHAR \
+              ( \
+                  20 \
+              ) DEFAULT 'channel' NOT NULL,
+                  level VARCHAR \
+              ( \
+                  20 \
+              ) DEFAULT 'primary' NOT NULL
+                  ) CHARSET = utf8mb3;
               """
         self.execute(sql, commit=True)
 
@@ -211,12 +218,17 @@ class Database:
                   ban INT NOT NULL,
                   sana TEXT NOT NULL,
                   status TEXT NOT NULL,
+                  subscription_level VARCHAR \
+              ( \
+                  20 \
+              ) DEFAULT 'none' NOT NULL,
+                  last_check_time DATETIME DEFAULT NULL,
                   join_requests JSON DEFAULT \
               ( \
                   JSON_OBJECT \
               ( \
-              )) -- Yangi ustun
-                  ) CHARSET = utf8mb3; \
+              ))
+                  ) CHARSET = utf8mb3;
               """
         self.execute(sql, commit=True)
 
@@ -354,12 +366,12 @@ class Database:
               """
         self.execute(sql, parameters=(chat_id,), commit=True)
 
-    def add_kanal(self, chat_id: str, url: str, type: str = 'channel'):
+    def add_kanal(self, chat_id: str, url: str, type: str = 'channel', level: str = 'primary'):
         sql = """
-              INSERT INTO kanal(chat_id, url, type) \
-              VALUES (%s, %s, %s) \
+              INSERT INTO kanal(chat_id, url, type, level) \
+              VALUES (%s, %s, %s, %s) \
               """
-        self.execute(sql, parameters=(chat_id, url, type), commit=True)
+        self.execute(sql, parameters=(chat_id, url, type, level), commit=True)
 
     def delete_kanal(self, chat_id):
         sql = "DELETE FROM kanal WHERE chat_id = %s"
@@ -538,6 +550,30 @@ class Database:
         print(
             f"DEBUG: has_join_request - User {user_id}, Channel {channel_id_str}, Join_requests: {join_requests}, Result: {result}")  # Debug
         return result
+
+    def update_channel_level(self, chat_id: str, level: str):
+        sql = "UPDATE kanal SET level = %s WHERE chat_id = %s"
+        self.execute(sql, parameters=(level, chat_id), commit=True)
+
+    def get_channels_by_level(self, level: str):
+        sql = "SELECT * FROM kanal WHERE level = %s"
+        return self.execute(sql, parameters=(level,), fetchall=True)
+
+    def update_user_subscription_level(self, user_id: int, level: str):
+        from datetime import datetime
+        sql = "UPDATE users SET subscription_level = %s, last_check_time = %s WHERE user_id = %s"
+        self.execute(sql, parameters=(level, datetime.now(), str(user_id)), commit=True)
+
+    def get_channels_paginated(self, offset: int = 0, limit: int = 10):
+        """Paginated kanallarni olish"""
+        sql = "SELECT * FROM kanal ORDER BY id LIMIT %s OFFSET %s"
+        return self.execute(sql, parameters=(limit, offset), fetchall=True)
+
+    def count_channels(self):
+        """Jami kanallar sonini qaytarish"""
+        sql = "SELECT COUNT(*) as total FROM kanal"
+        result = self.execute(sql, fetchone=True)
+        return result['total'] if result else 0
 
 
 def logger(statement):
