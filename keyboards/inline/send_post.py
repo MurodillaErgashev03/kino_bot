@@ -1,3 +1,4 @@
+#keyboards/inline/send_post.py
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
 

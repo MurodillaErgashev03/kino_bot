@@ -1,3 +1,4 @@
+#middleware/subscription_middleware.py
 import time
 from datetime import datetime
 from typing import Any, Awaitable, Callable, cast, Dict
@@ -11,10 +12,7 @@ from aiogram.types import TelegramObject, Update, InlineKeyboardMarkup, InlineKe
 from handlers.users.start import get_unsubscribed_channels
 
 from loader import db, bot  # bot ni ham import qilamiz, chunki get_unsubscribed_channels uni ishlatadi
-
-
 # from aiogram import types - types ni o'rniga Message ni import qildik
-
 class UserCheckMiddleware(BaseMiddleware):
 
     async def __call__(
@@ -27,7 +25,6 @@ class UserCheckMiddleware(BaseMiddleware):
         # Chunki bizga event.message kerak. Agar event Message emas, boshqa tur bo'lsa (masalan, CallbackQuery),
         # bu yerda xatolik bo'lmasligi uchun tekshiramiz.
         message = event.message  # Message obyektini to'g'ridan-to'g'ri event.message dan olamiz
-
         if not message:  # Agar xabar mavjud bo'lmasa (masalan, bu callback_query bo'lsa), keyingi handlerga o'tamiz
             return await handler(event, data)
 
@@ -66,7 +63,7 @@ class UserCheckMiddleware(BaseMiddleware):
             subscribe_buttons.append([InlineKeyboardButton(text="Obuna bo'ldim ✅", callback_data="subscribe_true")])
 
             await message.answer(  # event.message o'rniga to'g'ridan-to'g'ri message dan foydalanamiz
-                "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling (agar maxfiy kanal bo'lsa, qo'shilish so'rovini yuboring):",
+                "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:",
                 reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons)
             )
             return  # Agar obuna bo'lmagan bo'lsa, keyingi handlerga o'tishni to'xtatamiz

@@ -1,4 +1,4 @@
-# start.py
+#handlers/users/start.py
 
 import json
 from datetime import datetime
@@ -7,67 +7,123 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatJoinRequest
 
-from keyboards.inline.buttons import subscription_button  # Bu sizning inline tugmalar faylingiz
+from keyboards.inline.buttons import subscription_button
 from loader import dp, db, bot, is_admin
 from aiogram import types
-
 
 
 async def get_unsubscribed_channels(user_id: int) -> list:
     """
     Foydalanuvchi obuna bo'lmagan yoki so'rov yubormagan kanallar ro'yxatini qaytaradi.
-    Har bir element {chat_id: ..., url: ...} lug'ati bo'ladi.
+
+    Instagram akkauntlar faqat barcha telegram kanallarga obuna bo'lmaganida ko'rinadi!
     """
 
     if await is_admin(user_id):
-        return []  # Admin bo'lsa, hech qanday obuna talabi yo'q
+        return []
 
     channels_to_subscribe = []
-    all_channels = db.get_all_channels()  # Barcha majburiy kanallarni bazadan olamiz
+    all_items = db.get_all_channels()
 
-    if not all_channels:
-        return []  # Agar majburiy kanallar yo'q bo'lsa
+    if not all_items:
+        return []
 
-    for channel in all_channels:
-        channel_id_str = channel['chat_id']
-        channel_url = channel.get('url', '#')  # url ni ham olamiz
+    # Telegram kanallar va Instagram akkauntlarni ajratish
+    telegram_items = [item for item in all_items if item.get('type', 'channel') in ['channel', 'group']]
+    instagram_items = [item for item in all_items if item.get('type', 'channel') == 'instagram']
 
-        # chat_id ni int ga o'tkazish, bot.get_chat_member talab qiladi
+    all_telegram_subscribed = True  # Barcha telegram kanallarga obuna bo'lganmi?
+
+    print(f"\n{'=' * 50}")
+    print(f"DEBUG: get_unsubscribed_channels - User {user_id}")
+    print(f"DEBUG: Jami telegram kanallar: {len(telegram_items)}")
+    print(f"DEBUG: Jami instagram: {len(instagram_items)}")
+
+    # FAQAT TELEGRAM KANALLARNI TEKSHIRISH
+    for item in telegram_items:
+        channel_id_str = item['chat_id']
+        channel_url = item.get('url', '#')
+        channel_type = item.get('type', 'channel')
+
+        print(f"  - Tekshirilmoqda: {channel_id_str} (type: {channel_type})")
+
+        # PRIVATE KANAL/GURUH TEKSHIRUVI
+        if channel_id_str.startswith('private_'):
+            user = db.get_user(user_id)
+            join_requests = user.get('join_requests', {}) if user else {}
+            is_satisfied = len(join_requests) > 0
+
+            if is_satisfied:
+                print(f"    ✅ Private - Join request tashlagan")
+            else:
+                channels_to_subscribe.append({
+                    'chat_id': channel_id_str,
+                    'url': channel_url,
+                    'type': channel_type
+                })
+                all_telegram_subscribed = False
+                print(f"    ❌ Private - Join request YO'Q")
+
+            continue
+
+        # ODDIY KANAL/GURUH TEKSHIRUVI
         try:
             channel_id_int = int(channel_id_str)
         except ValueError:
-            print(f"Xato: Noto'g'ri kanal ID formati: {channel_id_str}")
-            continue  # Noto'g'ri ID bo'lsa, keyingi kanalga o'tamiz
+            print(f"Xato: Noto'g'ri ID: {channel_id_str}")
+            continue
 
         is_satisfied = False
 
         try:
             chat_member = await bot.get_chat_member(chat_id=channel_id_int, user_id=user_id)
-            print(f"DEBUG: User {user_id}, Channel {channel_id_str}, Status: {chat_member.status}")  # Debug
+            print(f"    Status: {chat_member.status}")
 
             if chat_member.status in ['member', 'administrator', 'creator']:
                 is_satisfied = True
-                # Agar oldingi so'rov qabul qilingan bo'lsa, uni bazadan o'chiramiz
+                print(f"    ✅ OBUNA BO'LGAN")
                 if db.has_join_request(user_id, channel_id_int):
                     db.remove_join_request(user_id, channel_id_int)
             elif db.has_join_request(user_id, channel_id_int):
-                is_satisfied = True  # Foydalanuvchi so'rov yuborgan, talab bajarilgan deb hisoblaymiz
+                is_satisfied = True
+                print(f"    ✅ JOIN REQUEST TASHLAGAN")
 
         except TelegramBadRequest as e:
-            # Agar bot foydalanuvchini kanalda topa olmasa (masalan, hali so'rov yubormagan yoki bloklagan)
-            print(f"DEBUG: TelegramBadRequest for User {user_id}, Channel {channel_id_str}: {e}")  # Debug
+            print(f"    TelegramBadRequest: {e}")
             if db.has_join_request(user_id, channel_id_int):
-                is_satisfied = True  # Agar so'rov yuborgan bo'lsa, ruxsat beramiz
+                is_satisfied = True
+                print(f"    ✅ JOIN REQUEST TASHLAGAN")
         except Exception as e:
-            print(f"DEBUG: Boshqa xato yuz berdi User {user_id}, Kanal {channel_id_str}: {e}")  # Debug
-            is_satisfied = False  # Noma'lum xato bo'lsa, obuna bo'lmagan deb hisoblaymiz
+            print(f"    Xato: {e}")
+            if db.has_join_request(user_id, channel_id_int):
+                is_satisfied = True
+                print(f"    ✅ JOIN REQUEST TASHLAGAN")
 
         if not is_satisfied:
-            channels_to_subscribe.append({'chat_id': channel_id_str, 'url': channel_url})
-            print(f"DEBUG: {channel_id_str} kanaliga obuna bo'lishi kerak. Ro'yxatga qo'shildi.")  # Debug
+            channels_to_subscribe.append({
+                'chat_id': channel_id_str,
+                'url': channel_url,
+                'type': channel_type
+            })
+            all_telegram_subscribed = False
+            print(f"    ❌ Obuna/Request YO'Q")
+
+    # INSTAGRAM MANTIQ: Faqat telegram kanallarga obuna BO'LMAGAN bo'lsa ko'rsat
+    if not all_telegram_subscribed:
+        for insta in instagram_items:
+            channels_to_subscribe.append({
+                'chat_id': insta['chat_id'],
+                'url': insta['url'],
+                'type': 'instagram'
+            })
+            print(f"  📸 Instagram qo'shildi: {insta['url']}")
+    else:
+        print(f"  ✅ Barcha telegram kanallarga obuna - Instagram ko'rsatilmaydi")
+
+    print(f"DEBUG: Jami obuna bo'lmagan: {len(channels_to_subscribe)}")
+    print(f"{'=' * 50}\n")
 
     return channels_to_subscribe
-
 
 @dp.message(CommandStart())
 async def start_bot(message: types.Message):
@@ -93,20 +149,40 @@ Marhamat, kerakli kodni yuboring:"""
         await message.reply(msg, reply_markup=chanel)
     else:
         subscribe_buttons = []
-        for i, channel_info in enumerate(unsubscribed_channels):
-            channel_name = f"{i + 1}-kanal"
-            if channel_info['url'] != '#':
-                subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=channel_info['url'])])
+        channel_counter = 1
+        has_private_channels = False
+
+        for item in unsubscribed_channels:
+            item_type = item.get('type', 'channel')
+            chat_id = item.get('chat_id', '')
+
+            # Private kanal tekshiruvi
+            if chat_id.startswith('private_'):
+                has_private_channels = True
+
+            if item_type == 'instagram':
+                # Instagram uchun alohida tugma
+                subscribe_buttons.append([
+                    InlineKeyboardButton(text="📸 Instagram akkauntga obuna bo'ling", url=item['url'])
+                ])
             else:
-                subscribe_buttons.append(
-                    [InlineKeyboardButton(text=channel_name, callback_data=f"check_channel_{channel_info['chat_id']}")])
+                # Telegram kanal/guruh uchun
+                channel_name = f"{channel_counter}-kanal"
+                if item['url'] != '#':
+                    subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=item['url'])])
+                else:
+                    subscribe_buttons.append([
+                        InlineKeyboardButton(text=channel_name, callback_data=f"check_channel_{item['chat_id']}")
+                    ])
+                channel_counter += 1
 
         subscribe_buttons.append([InlineKeyboardButton(text="Obuna bo'ldim ✅", callback_data="subscribe_true")])
 
-        await message.answer(
-            "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling (agar maxfiy kanal bo'lsa, qo'shilish so'rovini yuboring):",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons)
-        )
+        # Xabar matni
+        main_text = "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling :"
+
+
+        await message.answer(main_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons))
 
 
 @dp.callback_query(lambda c: c.data == "subscribe_true")
@@ -115,55 +191,71 @@ async def oldim(call: types.CallbackQuery):
 
     user_id = call.from_user.id
 
-    # get_unsubscribed_channels funksiyasi chaqiriladi
-    # Bu funksiya foydalanuvchining obuna holatini qayta tekshiradi
-    # va obuna bo'lmagan yoki so'rov yubormagan kanallar ro'yxatini qaytaradi.
     unsubscribed_channels = await get_unsubscribed_channels(user_id)
 
     if not unsubscribed_channels:
-        # Agar ro'yxat bo'sh bo'lsa, demak foydalanuvchi barcha kanallarga
-        # obuna bo'lgan yoki maxfiy kanalga so'rov yuborgan.
         msg = """👋 Salom 
 
-        Marhamat, kerakli kodni yuboring:"""
+Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/darkvayb")]])
         await call.message.answer(msg, reply_markup=chanel)
     else:
-        # Agar hali ham obuna bo'lishi kerak bo'lgan kanallar bo'lsa,
-        # ularni qaytadan ko'rsatamiz.
         subscribe_buttons = []
-        for i, channel_info in enumerate(unsubscribed_channels):
-            channel_name = f"{i + 1}-kanal"
-            if channel_info['url'] != '#':
-                subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=channel_info['url'])])
+        channel_counter = 1
+        has_private_channels = False
+
+        for item in unsubscribed_channels:
+            item_type = item.get('type', 'channel')
+            chat_id = item.get('chat_id', '')
+
+            # Private kanal tekshiruvi
+            if chat_id.startswith('private_'):
+                has_private_channels = True
+
+            if item_type == 'instagram':
+                # Instagram uchun alohida tugma
+                subscribe_buttons.append([
+                    InlineKeyboardButton(text="📸 Instagram akkauntga obuna bo'ling", url=item['url'])
+                ])
             else:
-                subscribe_buttons.append(
-                    [InlineKeyboardButton(text=channel_name, callback_data=f"check_channel_{channel_info['chat_id']}")])
+                # Telegram kanal/guruh uchun
+                channel_name = f"{channel_counter}-kanal"
+                if item['url'] != '#':
+                    subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=item['url'])])
+                else:
+                    subscribe_buttons.append([
+                        InlineKeyboardButton(text=channel_name, callback_data=f"check_channel_{item['chat_id']}")
+                    ])
+                channel_counter += 1
 
         subscribe_buttons.append([InlineKeyboardButton(text="Obuna bo'ldim ✅", callback_data="subscribe_true")])
 
-        await call.message.answer(
-            "Iltimios! ⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling (agar maxfiy kanal bo'lsa, qo'shilish so'rovini yuboring):",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons)
-        )
-    await call.answer()  # Callback query ni yopish
+        # Xabar matni
+        main_text = "⚠️ Quyidagi kanallarga obuna bo'ling:"
 
-# Yangi handler: Foydalanuvchi kanalga qo'shilish so'rovini yuborganida
+
+        await call.message.answer(main_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons))
+    await call.answer()
+
+
+# MUHIM HANDLER: Foydalanuvchi kanalga qo'shilish so'rovini yuborganida
 @dp.chat_join_request()
 async def process_join_request(join_request: ChatJoinRequest):
     user_id = join_request.from_user.id
     channel_id = join_request.chat.id
 
+    # Join request ni bazaga yozish
     db.add_join_request(user_id, channel_id)
-    print(f"Foydalanuvchi {user_id} kanal {channel_id} ga qo'shilish so'rovini yubordi. Bazaga yozildi.")
+    print(f"✅ JOIN REQUEST HANDLER:")
+    print(f"   User: {user_id}")
+    print(f"   Channel: {channel_id}")
+    print(f"   Bu user endi botdan foydalana oladi!")
 
-    # So'rov yuborilgandan keyin foydalanuvchiga yana bir bor tekshirishni taklif qilish mumkin
-    # Masalan, uni /start ga yo'naltirish yoki "Obuna bo'ldim" tugmasini qayta bosishni so'rash
-    # Hozircha hech narsa yubormaymiz, chunki foydalanuvchi o'zi /start yoki "Obuna bo'ldim" ni bosadi
+    # XABAR YUBORMAYMIZ - User o'zi "Obuna bo'ldim" ni bosadi
 
 
-# callback_data orqali kelgan kanallar uchun, agar URL bo'lmasa (masalan, shaxsiy kanallar uchun)
+# callback_data orqali kelgan kanallar uchun
 @dp.callback_query(lambda c: c.data.startswith("check_channel_"))
 async def check_single_channel_subscription(call: types.CallbackQuery):
     channel_id_str = call.data.split("_")[2]
@@ -174,26 +266,42 @@ async def check_single_channel_subscription(call: types.CallbackQuery):
     if not unsubscribed_channels:
         msg = """👋 Salom 
 
-        Marhamat, kerakli kodni yuboring:"""
+Marhamat, kerakli kodni yuboring:"""
         chanel = InlineKeyboardMarkup(inline_keyboard=[[
             InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/darkvayb")]])
         await call.message.answer(msg, reply_markup=chanel)
-        await call.message.delete()  # Eski xabarni o'chirish
+        await call.message.delete()
     else:
-        # Hali ham obuna bo'lishi kerak bo'lgan kanallar bo'lsa, qayta ko'rsatamiz
         subscribe_buttons = []
-        for i, channel_info in enumerate(unsubscribed_channels):
-            channel_name = f"{i + 1}-kanal"
-            if channel_info['url'] != '#':
-                subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=channel_info['url'])])
+        channel_counter = 1
+        has_private_channels = False
+
+        for item in unsubscribed_channels:
+            item_type = item.get('type', 'channel')
+            chat_id = item.get('chat_id', '')
+
+            # Private kanal tekshiruvi
+            if chat_id.startswith('private_'):
+                has_private_channels = True
+
+            if item_type == 'instagram':
+                subscribe_buttons.append([
+                    InlineKeyboardButton(text="📸 Instagram akkauntga obuna bo'ling", url=item['url'])
+                ])
             else:
-                subscribe_buttons.append(
-                    [InlineKeyboardButton(text=channel_name, callback_data=f"check_channel_{channel_info['chat_id']}")])
+                channel_name = f"{channel_counter}-kanal"
+                if item['url'] != '#':
+                    subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=item['url'])])
+                else:
+                    subscribe_buttons.append([
+                        InlineKeyboardButton(text=channel_name, callback_data=f"check_channel_{item['chat_id']}")
+                    ])
+                channel_counter += 1
 
         subscribe_buttons.append([InlineKeyboardButton(text="Obuna bo'ldim ✅", callback_data="subscribe_true")])
 
-        await call.message.edit_text(
-            "Iltimos! ⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling (agar maxfiy kanal bo'lsa, qo'shilish so'rovini yuboring):",
-            reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons)
-        )
-    await call.answer()  # Callback query ni yopish
+        # Xabar matni
+        main_text = "⚠️ Quyidagi kanallarga obuna bo'ling"
+
+        await call.message.edit_text(main_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons))
+    await call.answer()

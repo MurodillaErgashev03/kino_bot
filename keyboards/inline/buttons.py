@@ -1,3 +1,4 @@
+#keyboards/inline/buttons.py
 from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 from loader import db
@@ -12,6 +13,7 @@ async def yes_no_button():
     )
     return button
 
+
 async def yes_no_button_episode():
     button = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -20,6 +22,8 @@ async def yes_no_button_episode():
 
     )
     return button
+
+
 async def yes_no_button_confirmation():
     buttons = InlineKeyboardMarkup(
         inline_keyboard=[
@@ -28,6 +32,7 @@ async def yes_no_button_confirmation():
         ]
     )
     return buttons
+
 
 async def yes_no_button_2():
     button = InlineKeyboardMarkup(
@@ -40,31 +45,57 @@ async def yes_no_button_2():
 
 
 async def subscription_button():
-    channels = db.get_all_channels()  # channels: [{'chat_id': '-1001562032753', 'url': 'https://t.me/...'}, ...]
+    channels = db.get_all_channels()  # channels: [{'chat_id': '-1001562032753', 'url': 'https://t.me/...', 'type': 'channel'}, ...]
     inline_keyboard = []
 
     for sanoq, channel in enumerate(channels, start=1):
-        button = InlineKeyboardButton(text=f"{sanoq} - kanal", url=channel['url'])
+        channel_type = channel.get('type', 'channel')
+
+        # Type bo'yicha emoji tanlash
+        if channel_type == 'instagram':
+            emoji = "📸"
+            text = f"{emoji} Instagram"
+        elif channel_type == 'group':
+            emoji = "👥"
+            text = f"{sanoq} - guruh"
+        else:  # channel
+            emoji = "📢"
+            text = f"{sanoq} - kanal"
+
+        button = InlineKeyboardButton(text=text, url=channel['url'])
         inline_keyboard.append([button])
 
     inline_keyboard.append([
-        InlineKeyboardButton(text="Obuna bo'ldim✅", callback_data="subscribe_true")  # callback_data qisqa va aniq
+        InlineKeyboardButton(text="Obuna bo'ldim✅", callback_data="subscribe_true")
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
+
 async def delete_channel_button():
-    kanallar = db.get_all_channels()
+    """O'chirish uchun barcha obunalarni ko'rsatish (type bilan)"""
+    items = db.get_all_channels()
     inline_keyboard = []
 
-    for kanal in kanallar:
+    for item in items:
+        item_type = item.get('type', 'channel')
+        url = item['url']
+
+        # Type bo'yicha ko'rsatish
+        if item_type == 'instagram':
+            # Instagram username'ini URL dan ajratib olish
+            username = url.split('/')[-2] if url.endswith('/') else url.split('/')[-1]
+            text = f"📸 Instagram: {username}"
+        elif item_type == 'group':
+            text = f"👥 Guruh: {url}"
+        else:  # channel
+            text = f"📢 Kanal: {url}"
+
         tugma = InlineKeyboardButton(
-            text=f"{kanal['url']}",
-            callback_data=f"delete_channel_{kanal['chat_id']}"
+            text=text,
+            callback_data=f"delete_channel_{item['chat_id']}"
         )
         inline_keyboard.append([tugma])
-
-
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
@@ -82,10 +113,6 @@ async def delete_admin_button():
 
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
-
-
-
-from aiogram.types import InlineKeyboardButton, InlineKeyboardMarkup
 
 def generate_episode_buttons(episodes, serial_id, page=1, per_page=5):
     buttons = []
@@ -113,9 +140,11 @@ def generate_episode_buttons(episodes, serial_id, page=1, per_page=5):
     # Sahifalash uchun "Oldingi" va "Keyingi" tugmalari
     pagination_row = []
     if page > 1:
-        pagination_row.append(InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"pagination_{serial_id}_{page - 1}"))
+        pagination_row.append(
+            InlineKeyboardButton(text="⬅️ Oldingi", callback_data=f"pagination_{serial_id}_{page - 1}"))
     if end_index < len(episodes):
-        pagination_row.append(InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"pagination_{serial_id}_{page + 1}"))
+        pagination_row.append(
+            InlineKeyboardButton(text="Keyingi ➡️", callback_data=f"pagination_{serial_id}_{page + 1}"))
 
     if pagination_row:
         buttons.append(pagination_row)

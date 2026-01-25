@@ -1,3 +1,4 @@
+#state/film_add_states.py
 from aiogram.filters.state import State, StatesGroup
 
 
@@ -28,3 +29,14 @@ class FilmAddStates(StatesGroup):
     waiting_for_more_episodes_existing = State()
     waiting_for_episode_video_existing = State()
 
+    waiting_for_channel_username = State()
+    waiting_for_group_username = State()
+    waiting_for_instagram_username = State()
+    choose_channel_add_method = State()
+    waiting_for_group_username_or_forward = State()
+    waiting_for_group_link=State()
+    waiting_for_group_info = State()
+    waiting_for_group_chat_id = State()
+    waiting_for_channel_link_or_forward = State()
+    waiting_for_group_url = State()
+    waiting_for_channel_chat_id = State()

@@ -140,7 +140,8 @@ class Database:
               ( \
                   64 \
               ) NOT NULL,
-                  url TEXT NOT NULL
+                  url TEXT NOT NULL,
+                  type VARCHAR(20) DEFAULT 'channel' NOT NULL
                   ) CHARSET = utf8mb3; \
               """
         self.execute(sql, commit=True)
@@ -325,12 +326,6 @@ class Database:
         sql = "SELECT * FROM serials"
         return self.execute(sql, fetchall=True)
 
-    # Yuqoridagi get_episodes_by_serial_id dublikat edi, birini olib tashladim.
-    # def get_episodes_by_serial_id(self, serial_id: int):
-    #     sql = "SELECT * FROM episodes WHERE serial_id = %s ORDER BY episode_number"
-    #     result = self.execute(sql, parameters=(serial_id,), fetchall=True)
-    #     return result
-
     def add_admin(self, user_id: str, user_name: str):
         sql = """
               INSERT INTO admins(user_id, user_name) \
@@ -359,12 +354,12 @@ class Database:
               """
         self.execute(sql, parameters=(chat_id,), commit=True)
 
-    def add_kanal(self, chat_id: str, url: str):
+    def add_kanal(self, chat_id: str, url: str, type: str = 'channel'):
         sql = """
-              INSERT INTO kanal(chat_id, url) \
-              VALUES (%s, %s) \
+              INSERT INTO kanal(chat_id, url, type) \
+              VALUES (%s, %s, %s) \
               """
-        self.execute(sql, parameters=(chat_id, url), commit=True)
+        self.execute(sql, parameters=(chat_id, url, type), commit=True)
 
     def delete_kanal(self, chat_id):
         sql = "DELETE FROM kanal WHERE chat_id = %s"
@@ -374,6 +369,20 @@ class Database:
         sql = "SELECT url FROM kanal"
         channels = self.execute(sql, fetchall=True)
         return [channel['url'] for channel in channels]  # Faqat url'ni qaytaradi
+
+    # YANGILANGAN - type bo'yicha filtr
+    def get_channels_by_type(self, type: str):
+        """Type bo'yicha kanallarni olish (channel, group, instagram)"""
+        sql = "SELECT * FROM kanal WHERE type = %s"
+        return self.execute(sql, parameters=(type,), fetchall=True)
+
+    # YANGILANGAN - barcha kanallarni type bilan olish
+    def get_all_channels(self):
+        sql = """
+              SELECT * \
+              FROM kanal \
+              """
+        return self.execute(sql, fetchall=True)
 
     def add_senduser(self, mid: int, soni: int, boshlash_vaqt: str, joriy_vaqt: str, status: str, send: str, holat: str,
                      nosend: str, qayerga: str, admin: str):
@@ -396,13 +405,6 @@ class Database:
         sql = """
               SELECT * \
               FROM users \
-              """
-        return self.execute(sql, fetchall=True)
-
-    def get_all_channels(self):
-        sql = """
-              SELECT * \
-              FROM kanal \
               """
         return self.execute(sql, fetchall=True)
 
@@ -530,10 +532,11 @@ class Database:
 
         join_requests = user['join_requests']  # Bu yerda u allaqachon lug'at bo'lishi kerak
 
+        # MUHIM: String sifatida tekshirish (bazada string sifatida saqlangan)
         channel_id_str = str(channel_id)
         result = channel_id_str in join_requests and join_requests[channel_id_str]
         print(
-            f"DEBUG: has_join_request - User {user_id}, Channel {channel_id}. Result: {result}, Requests: {join_requests}")  # Debug
+            f"DEBUG: has_join_request - User {user_id}, Channel {channel_id_str}, Join_requests: {join_requests}, Result: {result}")  # Debug
         return result
 
 

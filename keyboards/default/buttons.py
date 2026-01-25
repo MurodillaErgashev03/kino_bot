@@ -1,3 +1,4 @@
+#keyboards/default/buttons.py
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 from aiogram.utils.keyboard import ReplyKeyboardMarkup, KeyboardButton
 
@@ -27,6 +28,35 @@ def majburiy_obuna():
     return button
 
 
+# YANGI FUNKSIYA - Kanal/Guruh/Instagram tanlash
+def choose_subscription_type():
+    button = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="📢 Kanal qo'shish")],
+            [KeyboardButton(text="👥 Guruh qo'shish")],
+            [KeyboardButton(text="📸 Instagram akkaunt qo'shish")],
+            [KeyboardButton(text="🔙 Orqaga")]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+    return button
+
+
+# YANGI FUNKSIYA - Kanal qo'shish usulini tanlash
+def choose_channel_add_method():
+    button = ReplyKeyboardMarkup(
+        keyboard=[
+            [KeyboardButton(text="👤 Username orqali qo'shish")],
+            [KeyboardButton(text="📨 Kanal habari orqali qo'shish")],
+            [KeyboardButton(text="🔙 Orqaga")]
+        ],
+        resize_keyboard=True,
+        one_time_keyboard=True,
+    )
+    return button
+
+
 def film_delete_or_join():
     button = ReplyKeyboardMarkup(
         keyboard=[
@@ -38,16 +68,19 @@ def film_delete_or_join():
     )
     return button
 
+
 def serial_delete_or_join():
     button = ReplyKeyboardMarkup(
         keyboard=[
             [KeyboardButton(text="➕ Yangi serial joylash"), KeyboardButton(text="➖ Serial o'chrish")],
-            [KeyboardButton(text="➕ Serialning qismlarini qo'shish")],[KeyboardButton(text="🔝 Asosiy admin panelga qaytish")]
+            [KeyboardButton(text="➕ Serialning qismlarini qo'shish")],
+            [KeyboardButton(text="🔝 Asosiy admin panelga qaytish")]
         ],
         resize_keyboard=True,
         one_time_keyboard=True,
     )
     return button
+
 
 def add_admin():
     button = ReplyKeyboardMarkup(
@@ -59,6 +92,7 @@ def add_admin():
         one_time_keyboard=False,
     )
     return button
+
 
 def confirm_cancel_buttons():
     """

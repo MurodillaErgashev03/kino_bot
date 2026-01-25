@@ -1,4 +1,4 @@
-#add_admin.py
+#handlers/users/add_admin.py
 
 from aiogram.fsm.context import FSMContext
 from aiogram.types import CallbackQuery
