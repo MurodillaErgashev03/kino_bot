@@ -412,21 +412,16 @@ async def delete_channel(message: types.Message):
     await message.answer("O'chirmoqchi bo'lgan obunangizni ustiga bosing!", reply_markup=await delete_channel_button())
 
 
+# handlers/users/majburiy_obuna.py
+
 @dp.callback_query(lambda c: c.data.startswith('delete_channel_'))
 async def process_channel_deletion(callback_query: CallbackQuery):
     try:
         # Callback data dan chat_id ni olish
         # Format: delete_channel_{chat_id}
-        parts = callback_query.data.split('_')
-        if len(parts) >= 3:
-            # Agar chat_id private_ bilan boshlansa, to'liq ID ni olish kerak
-            if parts[2] == 'private':
-                # delete_channel_private_xvzslHs1WCtjMGUy
-                chat_id = '_'.join(parts[2:])  # private_xvzslHs1WCtjMGUy
-            else:
-                chat_id = parts[2]  # -1001234567
-        else:
-            chat_id = parts[2]
+
+        # "delete_channel_" dan keyingi qismni olish
+        chat_id = callback_query.data.replace('delete_channel_', '')
 
         if not chat_id:
             raise ValueError("Chat ID topilmadi")
@@ -434,16 +429,16 @@ async def process_channel_deletion(callback_query: CallbackQuery):
         # Ma'lumotlar bazasidan o'chirish
         db.delete_kanal(chat_id)
 
-        print(f"✅ Kanal o'chirildi: {chat_id}")
+        print(f"✅ Kanal/Guruh/Instagram o'chirildi: {chat_id}")
 
         await callback_query.answer("Obuna muvaffaqiyatli o'chirildi!")
         await callback_query.message.edit_text(
             "✅ Tanlangan obuna muvaffaqiyatli o'chirildi!",
-            reply_markup=None  # Barcha tugmalarni o'chirish
+            reply_markup=None
         )
 
     except Exception as e:
-        print(f"❌ Kanalni o'chirishda xatolik: {str(e)}")
+        print(f"❌ Obunani o'chirishda xatolik: {str(e)}")
         await callback_query.answer("Xatolik yuz berdi!")
         await callback_query.message.edit_text(
             f"❌ Obunani o'chirishda xatolik: {str(e)}",
