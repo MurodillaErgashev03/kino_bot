@@ -7,7 +7,7 @@ from aiogram.exceptions import TelegramBadRequest
 from aiogram.filters import CommandStart
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, ChatJoinRequest
 
-from keyboards.inline.buttons import subscription_button
+from keyboards.inline.buttons import subscription_button, generate_episode_buttons
 from loader import dp, db, bot, is_admin
 from aiogram import types
 
@@ -152,16 +152,65 @@ async def get_unsubscribed_channels(user_id: int) -> list:
 
     return channels_to_subscribe
 
+
+
 @dp.message(CommandStart())
 async def start_bot(message: types.Message):
     user_id = message.from_user.id
+
+    # Deep link tekshirish
+    args = message.text.split()
+    if len(args) > 1:
+        # FILM uchun
+        if args[1].startswith('film_'):
+            film_kod = args[1].replace('film_', '')
+
+            # Filmni bazadan olish
+            film = db.get_film_by_name(film_kod)
+
+            if film:
+                caption = (
+                    f"⌨️ KOD: #{film_kod}\n"
+                    f"{film['file_name']}\n\n"
+                    f"📌 @darkvayb"
+                )
+                await message.answer_video(film['file_id'], caption=caption, parse_mode="HTML")
+                return
+            else:
+                await message.answer("❌ Film topilmadi!")
+                return
+
+        # SERIAL uchun
+        elif args[1].startswith('serial_'):
+            serial_kod = args[1].replace('serial_', '')
+
+            # Serialni bazadan olish
+            serial = db.get_serial_by_name(serial_kod)
+
+            if serial:
+                episodes = db.get_episodes_by_serial_id(serial['id'])
+
+                if episodes:
+                    # Epizodlar tugmalarini ko'rsatish
+                    await message.answer_photo(
+                        serial['serial_banner'],
+                        caption=serial['serial_title'],
+                        reply_markup=generate_episode_buttons(episodes, serial_id=serial['id'])
+                    )
+                    return
+                else:
+                    await message.answer("❌ Bu serialda hozircha qismlar mavjud emas!")
+                    return
+            else:
+                await message.answer("❌ Serial topilmadi!")
+                return
+
+    # Oddiy /start - obuna tekshirish
     try:
         user = db.get_user(user_id=user_id)
         if not user:
             db.add_user(user_id=str(message.from_user.id), ban=0, sana=str(datetime.now()), status="1")
             print(f"Yangi foydalanuvchi qo'shildi: {user_id}")
-        else:
-            print(f"Foydalanuvchi allaqachon mavjud: {user}")
     except Exception as e:
         print(f"Foydalanuvchini qo'shishda xatolik: {e}")
 
@@ -175,25 +224,19 @@ Marhamat, kerakli kodni yuboring:"""
             InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/darkvayb")]])
         await message.reply(msg, reply_markup=chanel)
     else:
+        # Obuna kerak
         subscribe_buttons = []
         channel_counter = 1
-        has_private_channels = False
 
         for item in unsubscribed_channels:
             item_type = item.get('type', 'channel')
             chat_id = item.get('chat_id', '')
 
-            # Private kanal tekshiruvi
-            if chat_id.startswith('private_'):
-                has_private_channels = True
-
             if item_type == 'instagram':
-                # Instagram uchun alohida tugma
                 subscribe_buttons.append([
                     InlineKeyboardButton(text="📸 Instagram akkauntga obuna bo'ling", url=item['url'])
                 ])
             else:
-                # Telegram kanal/guruh uchun
                 channel_name = f"{channel_counter}-kanal"
                 if item['url'] != '#':
                     subscribe_buttons.append([InlineKeyboardButton(text=channel_name, url=item['url'])])
@@ -205,10 +248,7 @@ Marhamat, kerakli kodni yuboring:"""
 
         subscribe_buttons.append([InlineKeyboardButton(text="Obuna bo'ldim ✅", callback_data="subscribe_true")])
 
-        # Xabar matni
-        main_text = "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling :"
-
-
+        main_text = "⚠️ Botdan foydalanish uchun, quyidagi kanallarga obuna bo'ling:"
         await message.answer(main_text, reply_markup=InlineKeyboardMarkup(inline_keyboard=subscribe_buttons))
 
 

@@ -10,3 +10,4 @@ from . import delete_serial
 from . import help
 from . import about
 from . import echo
+from . import send_to_channel

@@ -40,3 +40,4 @@ class FilmAddStates(StatesGroup):
     waiting_for_channel_link_or_forward = State()
     waiting_for_group_url = State()
     waiting_for_channel_chat_id = State()
+    waiting_for_channel_selection = State()

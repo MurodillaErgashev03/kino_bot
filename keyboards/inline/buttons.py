@@ -262,3 +262,83 @@ async def channel_detail_buttons(chat_id: str):
     ])
 
     return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+async def send_to_channel_button(kod: str):
+    """Kanalga yuborish tugmasi"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📤 Kanalga yuborish", callback_data=f"send_film_{kod}")],
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_send")]
+        ]
+    )
+    return keyboard
+
+
+async def select_channel_for_post():
+    """Kanal tanlash uchun tugmalar"""
+    channels = db.get_all_channels()
+    keyboard = []
+
+    for ch in channels:
+        ch_type = ch.get('type', 'channel')
+        url = ch.get('url', '')
+        chat_id = ch.get('chat_id', '')
+
+        # Faqat telegram kanal va guruhlar
+        if ch_type in ['channel', 'group']:
+            # Kanal nomini olish
+            try:
+                name = url.split('/')[-1]
+                emoji = "📢" if ch_type == 'channel' else "👥"
+                text = f"{emoji} {name}"
+            except:
+                text = f"Kanal/Guruh"
+
+            keyboard.append([
+                InlineKeyboardButton(
+                    text=text,
+                    callback_data=f"post_to_{chat_id}"
+                )
+            ])
+
+    keyboard.append([
+        InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_send")
+    ])
+
+    return InlineKeyboardMarkup(inline_keyboard=keyboard)
+
+
+async def watch_film_button(kod: str, bot_username: str):
+    """Tomosha qilish tugmasi (deep link)"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🔵 Tomosha qilish",
+                url=f"https://t.me/{bot_username}?start=film_{kod}"
+            )]
+        ]
+    )
+    return keyboard
+
+async def send_to_channel_button_serial(serial_kod: str):
+    """Serial uchun kanalga yuborish tugmasi"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(text="📤 Kanalga yuborish", callback_data=f"send_serial_{serial_kod}")],
+            [InlineKeyboardButton(text="❌ Bekor qilish", callback_data="cancel_send")]
+        ]
+    )
+    return keyboard
+
+async def watch_serial_button(serial_kod: str, bot_username: str):
+    """Serial tomosha qilish tugmasi (deep link)"""
+    keyboard = InlineKeyboardMarkup(
+        inline_keyboard=[
+            [InlineKeyboardButton(
+                text="🔵 Tomosha qilish",
+                url=f"https://t.me/{bot_username}?start=serial_{serial_kod}"
+            )]
+        ]
+    )
+    return keyboard

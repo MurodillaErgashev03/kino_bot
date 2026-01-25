@@ -102,40 +102,38 @@ async def more_episodes_decision_new_serial(callback_query: types.CallbackQuery,
     await callback_query.answer()
 
 
-# Yangi serialni tasdiqlash va bazaga saqlash
-@dp.callback_query(FilmAddStates.waiting_for_confirmation, F.data.in_(['confirm_yes', 'confirm_no']))
+@dp.callback_query(FilmAddStates.waiting_for_confirmation, F.data == 'confirm_yes')
 async def confirmation_callback_handler(callback_query: types.CallbackQuery, state: FSMContext):
-    answer = callback_query.data
-    if answer == 'confirm_yes':
-        data = await state.get_data()
-        serial_name = data.get('serial_name')
-        serial_banner = data.get('serial_banner')
-        serial_title = data.get('serial_title')
-        episodes = data.get('episodes', [])
+    data = await state.get_data()
+    serial_name = data.get('serial_name')
+    serial_banner = data.get('serial_banner')
+    serial_title = data.get('serial_title')
+    episodes = data.get('episodes', [])
 
-        try:
-            # Serialni bazaga qo'shish
-            db.add_serial(serial_name, serial_title, serial_banner)
-            serial_id = db.get_serial_id(serial_name)
+    try:
+        # Serialni bazaga qo'shish
+        db.add_serial(serial_name, serial_title, serial_banner)
+        serial_id = db.get_serial_id(serial_name)
 
-            if serial_id is None:
-                raise ValueError(f"Serial ID topilmadi uchun serial_name: {serial_name}")
+        if serial_id is None:
+            raise ValueError(f"Serial ID topilmadi")
 
-            # Epizodlarni bazaga qo'shish
-            for ep in episodes:
-                db.add_episode(serial_id, ep['episode_number'], ep['video_id'])
+        # Epizodlarni bazaga qo'shish
+        for ep in episodes:
+            db.add_episode(serial_id, ep['episode_number'], ep['video_id'])
 
-            await callback_query.message.answer("Serial va qismlar muvaffaqiyatli saqlandi!")
-            await state.clear()
-        except Exception as e:
-            await callback_query.message.answer("Serial va qismlarni saqlashda xatolik yuz berdi.")
-            await state.clear()
-            logger(f"Serial va qismlarni saqlashda xatolik: {str(e)}")
-    elif answer == 'confirm_no':
-        await callback_query.message.answer("Serial qo'shilmadi!")
-        await state.clear()
+        await callback_query.message.answer("✅ Serial va qismlar muvaffaqiyatli saqlandi!")
 
-    await callback_query.answer()
+        # Kanalga yuborish tugmasi
+        await state.update_data(serial_kod=serial_name)
+        await callback_query.message.answer(
+            "Serialni kanal yoki guruhga joylamoqchimisiz?",
+            reply_markup=await send_to_channel_button_serial(serial_name)
+        )
+
+    except Exception as e:
+        await callback_query.message.answer("❌ Xatolik yuz berdi.")
+        logger(f"Serial saqlashda xatolik: {str(e)}")
 
 
 # Mavjud serialga epizod qo'shish boshlash

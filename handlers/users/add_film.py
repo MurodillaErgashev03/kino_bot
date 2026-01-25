@@ -3,7 +3,7 @@ from aiogram.types import CallbackQuery
 
 from filters import IsBotAdmin
 from keyboards.default.buttons import admin_button
-from keyboards.inline.buttons import yes_no_button
+from keyboards.inline.buttons import yes_no_button, send_to_channel_button
 from loader import dp, bot, db
 from aiogram import types, F
 from aiogram.fsm.context import FSMContext
@@ -62,12 +62,22 @@ async def get_video_file_id(message: types.Message, state: FSMContext):
 async def get_check_1(call: CallbackQuery, state: FSMContext):
     data = await state.get_data()
     all_data = 1
-    print(data)
+
+    # Bazaga saqlash
     db.add_film_data(data['name'], data['film_id'], data['kod'], all_data)
 
-    await call.message.answer("Ma'lumotlari qabul qilindi\n")
+    await call.message.answer("✅ Film bazaga saqlandi!")
+
+    # State ga kod ni saqlash
+    await state.update_data(film_kod=data['kod'])
+
+    # Kanalga yuborish tugmasini ko'rsatish
+    await call.message.answer(
+        "Filmni kanal yoki guruhga joylamoqchimisiz?",
+        reply_markup=await send_to_channel_button(data['kod'])
+    )
+
     await call.message.delete()
-    await state.clear()
 
 
 @dp.callback_query(F.data == 'no', FilmAddStates.chekk)
