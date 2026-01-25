@@ -1,4 +1,4 @@
-# handlers/users/send_to_channel.py - TO'LIQ VERSIYA
+# handlers/users/send_to_channel.py - TO'LIQ KOD
 
 from aiogram import F, types
 from aiogram.types import CallbackQuery
@@ -33,68 +33,6 @@ async def ask_select_channel(callback_query: CallbackQuery, state: FSMContext):
     await callback_query.answer()
 
 
-# Tanlangan kanalga yuborish
-@dp.callback_query(FilmAddStates.waiting_for_channel_selection, lambda c: c.data.startswith('post_to_'))
-async def post_to_selected_channel(callback_query: CallbackQuery, state: FSMContext):
-    """Tanlangan kanalga film yuborish"""
-    chat_id = callback_query.data.replace('post_to_', '')
-
-    # State dan film kodini olish
-    data = await state.get_data()
-    film_kod = data.get('film_kod')
-
-    if not film_kod:
-        await callback_query.answer("❌ Xatolik!")
-        return
-
-    # Filmni bazadan olish
-    film = db.get_film_by_name(film_kod)
-
-    if not film:
-        await callback_query.answer("❌ Film topilmadi!")
-        return
-
-    try:
-        # Bot username ni olish
-        bot_info = await bot.get_me()
-        bot_username = bot_info.username
-
-        # Kanal/guruhga yuborish
-        caption = (
-            f"🎬 {film['file_name']}\n\n"
-            f"⌨️ KOD: #{film_kod}\n\n"
-            f"📌 @{bot_username}"
-        )
-
-        # Video bilan yuborish
-        await bot.send_video(
-            chat_id=int(chat_id),
-            video=film['file_id'],
-            caption=caption,
-            reply_markup=await watch_film_button(film_kod, bot_username)
-        )
-
-        await callback_query.message.edit_text("✅ Film muvaffaqiyatli yuborildi!")
-        await callback_query.answer("✅ Yuborildi!")
-
-        await state.clear()
-
-    except Exception as e:
-        await callback_query.answer(f"❌ Xatolik: {str(e)}")
-        await callback_query.message.edit_text(f"❌ Xatolik yuz berdi: {str(e)}")
-        await state.clear()
-
-
-# Bekor qilish
-@dp.callback_query(F.data == "cancel_send")
-async def cancel_send(callback_query: CallbackQuery, state: FSMContext):
-    await state.clear()
-    await callback_query.message.delete()
-    await callback_query.answer("❌ Bekor qilindi")
-
-
-# handlers/users/send_to_channel.py ga qo'shish
-
 # Serial uchun kanal tanlash
 @dp.callback_query(lambda c: c.data.startswith('send_serial_'))
 async def ask_select_channel_for_serial(callback_query: CallbackQuery, state: FSMContext):
@@ -120,7 +58,7 @@ async def ask_select_channel_for_serial(callback_query: CallbackQuery, state: FS
     await callback_query.answer()
 
 
-# Serialni kanalga yuborish
+# Tanlangan kanalga yuborish - Film va Serial uchun
 @dp.callback_query(FilmAddStates.waiting_for_channel_selection, lambda c: c.data.startswith('post_to_'))
 async def post_to_selected_channel(callback_query: CallbackQuery, state: FSMContext):
     """Tanlangan kanalga film yoki serial yuborish"""
@@ -145,17 +83,23 @@ async def post_to_selected_channel(callback_query: CallbackQuery, state: FSMCont
                 await callback_query.answer("❌ Film topilmadi!")
                 return
 
-            # Kanal/guruhga yuborish
+            film_banner = film.get('film_banner')
+
+            if not film_banner:
+                await callback_query.answer("❌ Film banneri topilmadi!")
+                return
+
+            # Kanal/guruhga yuborish - FAQAT RASM
             caption = (
                 f"🎬 {film['file_name']}\n\n"
                 f"⌨️ KOD: #{film_kod}\n\n"
                 f"📌 @{bot_username}"
             )
 
-            # Video bilan yuborish
-            await bot.send_video(
+            # RASM bilan yuborish (video emas!)
+            await bot.send_photo(
                 chat_id=int(chat_id),
-                video=film['file_id'],
+                photo=film_banner,
                 caption=caption,
                 reply_markup=await watch_film_button(film_kod, bot_username)
             )
@@ -205,3 +149,11 @@ async def post_to_selected_channel(callback_query: CallbackQuery, state: FSMCont
         await callback_query.answer(f"❌ Xatolik: {str(e)}")
         await callback_query.message.edit_text(f"❌ Xatolik yuz berdi: {str(e)}")
         await state.clear()
+
+
+# Bekor qilish
+@dp.callback_query(F.data == "cancel_send")
+async def cancel_send(callback_query: CallbackQuery, state: FSMContext):
+    await state.clear()
+    await callback_query.message.delete()
+    await callback_query.answer("❌ Bekor qilindi")

@@ -103,8 +103,12 @@ class Database:
                   `all` \
                   TEXT \
                   NOT \
+                  NULL,
+                  film_banner \
+                  TEXT \
+                  DEFAULT \
                   NULL
-              ) COLLATE = utf8mb4_general_ci; \
+              ) COLLATE = utf8mb4_general_ci;
               """
         self.execute(sql, commit=True)
 
@@ -452,7 +456,7 @@ class Database:
 
     def get_film_by_name(self, kod: int):
         sql = """
-              SELECT file_name, file_id, kod \
+              SELECT * \
               FROM data \
               WHERE kod = %s \
               """
@@ -471,12 +475,12 @@ class Database:
                 user_data['join_requests'] = {} # Xato bo'lsa, bo'sh lug'at
         return user_data
 
-    def add_film_data(self, file_name: str, file_id: str, kod: str, all_data: str):
+    def add_film_data(self, file_name: str, file_id: str, kod: str, all_data: str, film_banner: str = None):
         sql = """
-              INSERT INTO data(file_name, file_id, kod, `all`) \
-              VALUES (%s, %s, %s, %s) \
+              INSERT INTO data(file_name, file_id, kod, `all`, film_banner) \
+              VALUES (%s, %s, %s, %s, %s) \
               """
-        self.execute(sql, parameters=(file_name, file_id, kod, all_data), commit=True)
+        self.execute(sql, parameters=(file_name, file_id, kod, all_data, film_banner), commit=True)
 
     def get_all_data(self):
         sql = """
