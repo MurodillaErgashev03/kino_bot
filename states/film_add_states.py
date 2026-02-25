@@ -10,6 +10,8 @@ class FilmAddStates(StatesGroup):
     film_name = State()
     content = State()
     ask_ad_content = State()
+    ask_ad_duration = State()
+    ask_ad_custom_hours = State()
     file_name = State()
     check_kanal = State()
     waiting_for_channel_link=State()
