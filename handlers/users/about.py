@@ -1,11 +1,9 @@
-#handlers/users/about.py
 from aiogram.filters import Command
-from loader import dp
 from aiogram import types
 
+from handlers.users import user_router
 
-@dp.message(Command('about'))
-async def help_bot(message: types.Message):
+
+@user_router.message(Command('about'))
+async def about_bot(message: types.Message):
     await message.answer(f"MeshpolvonFilm Bot -  orqali siz o'zingizga yoqqan kinoni topishingiz mumkin 🎬 !\n")
-
-

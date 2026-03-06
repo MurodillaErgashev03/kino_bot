@@ -1,4 +1,2 @@
-from . import users
-from . import groups
-from . import channels
-from . import errors
+from handlers.admin import admin_router
+from handlers.users import user_router
