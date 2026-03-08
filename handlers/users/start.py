@@ -137,7 +137,7 @@ def _build_subscribe_buttons(unsubscribed_channels: list) -> InlineKeyboardMarku
 
 def _welcome_keyboard() -> InlineKeyboardMarkup:
     return InlineKeyboardMarkup(inline_keyboard=[[
-        InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/darkvayb")
+        InlineKeyboardButton(text="🔎 Kodlarni qidirish", url="https://t.me/premium_case_store")
     ]])
 
 
@@ -161,7 +161,7 @@ async def start_bot(message):
                 caption = (
                     f"⌨️ KOD: #{film_kod}\n"
                     f"{film['file_name']}\n\n"
-                    f"📌 @darkvayb"
+                    
                 )
                 await message.answer_video(film['file_id'], caption=caption, parse_mode="HTML")
                 return

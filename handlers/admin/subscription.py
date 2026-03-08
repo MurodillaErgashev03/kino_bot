@@ -36,7 +36,7 @@ async def add_channel_by_username_start(message: types.Message, state: FSMContex
     await message.answer(
         "Kanal username yoki linkini yuboring:\n\n"
         "📝 Formatlar:\n"
-        "• @darkvayb yoki darkvayb (public kanal)\n"
+   
         "• https://t.me/+UCLjH3QI1oQ5ZTli (private kanal)\n\n"
         "⚠️ Bot kanalda admin bo'lishi SHART!"
     )
